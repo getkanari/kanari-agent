@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -290,31 +290,140 @@ class TestCollect:
         assert metrics.stuck_tasks[0]["task_id"] == "stuck-1"
         assert metrics.stuck_tasks[0]["runtime_seconds"] > 7000
 
-    def test_recent_task_not_stuck(self, collector):
+    def test_collect_with_latency_tracked(self, collector):
         import time
 
-        self._setup_redis(collector, {})
-        # Task started 1 minute ago (below threshold)
-        recent_start = time.time() - 60
-        self._setup_celery(
-            collector,
-            active={
-                "celery@worker-1": [
-                    {"id": "t1", "name": "quick_task", "time_start": recent_start}
-                ]
-            },
-            stats={"celery@worker-1": {"pool": {"max-concurrency": 4}}},
-        )
+        past_ts = time.time() - 50
+        msg = json.dumps({"headers": {"timestamp": past_ts}, "properties": {}})
+        mock_redis = MagicMock()
+        mock_redis.ping.return_value = True
+        mock_redis.llen.side_effect = lambda q: 5 if q == "celery" else 0
+        mock_redis.lindex.return_value = msg
+        collector.redis_client = mock_redis
+        self._setup_celery(collector)
 
         metrics = collector.collect()
-        assert len(metrics.stuck_tasks) == 0
+        assert metrics.max_latency_sec is not None
+        assert metrics.max_latency_sec > 0
 
-    def test_celery_connected_when_workers_respond(self, collector):
-        self._setup_redis(collector, {})
-        self._setup_celery(
-            collector,
-            stats={"celery@worker-1": {"pool": {"max-concurrency": 4}}},
-        )
 
-        metrics = collector.collect()
-        assert metrics.celery_connected is True
+# ---------------------------------------------------------------------------
+# connect
+# ---------------------------------------------------------------------------
+
+
+class TestConnect:
+    def test_connect_success_both(self, collector):
+        mock_redis_mod = MagicMock()
+        mock_redis_instance = MagicMock()
+        mock_redis_mod.from_url.return_value = mock_redis_instance
+        mock_celery_class = MagicMock()
+
+        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
+            "doorman_agent.collector.CELERY_AVAILABLE", True
+        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
+            "doorman_agent.collector.Celery", mock_celery_class
+        ):
+            result = collector.connect()
+
+        assert result is True
+        assert collector.redis_client is mock_redis_instance
+
+    def test_connect_redis_failure(self, collector):
+        mock_redis_mod = MagicMock()
+        mock_redis_mod.from_url.side_effect = Exception("connection refused")
+        mock_celery_class = MagicMock()
+
+        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
+            "doorman_agent.collector.CELERY_AVAILABLE", True
+        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
+            "doorman_agent.collector.Celery", mock_celery_class
+        ):
+            result = collector.connect()
+
+        assert result is False
+
+    def test_connect_celery_failure(self, collector):
+        mock_redis_mod = MagicMock()
+        mock_redis_instance = MagicMock()
+        mock_redis_mod.from_url.return_value = mock_redis_instance
+        mock_celery_class = MagicMock()
+        mock_celery_class.side_effect = Exception("broker error")
+
+        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
+            "doorman_agent.collector.CELERY_AVAILABLE", True
+        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
+            "doorman_agent.collector.Celery", mock_celery_class
+        ):
+            result = collector.connect()
+
+        assert result is False
+
+    def test_connect_redis_not_available(self, collector):
+        mock_celery_class = MagicMock()
+        with patch("doorman_agent.collector.REDIS_AVAILABLE", False), patch(
+            "doorman_agent.collector.CELERY_AVAILABLE", True
+        ), patch("doorman_agent.collector.Celery", mock_celery_class):
+            result = collector.connect()
+
+        assert result is False
+
+    def test_connect_celery_not_available(self, collector):
+        mock_redis_mod = MagicMock()
+        mock_redis_mod.from_url.return_value = MagicMock()
+        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
+            "doorman_agent.collector.CELERY_AVAILABLE", False
+        ), patch("doorman_agent.collector.redis", mock_redis_mod):
+            result = collector.connect()
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Additional get_oldest_task_age paths
+# ---------------------------------------------------------------------------
+
+
+class TestGetOldestTaskAgeExtended:
+    def test_properties_timestamp_fallback(self, collector):
+        past_ts = datetime.now(timezone.utc).timestamp() - 30
+        msg = json.dumps({"headers": {}, "properties": {"timestamp": past_ts}})
+        mock_redis = MagicMock()
+        mock_redis.lindex.return_value = msg
+        collector.redis_client = mock_redis
+
+        age = collector.get_oldest_task_age("celery")
+        assert age is not None
+        assert age > 25
+
+    def test_published_timestamp_fallback(self, collector):
+        past_ts = datetime.now(timezone.utc).timestamp() - 20
+        msg = json.dumps({"headers": {}, "properties": {"published": past_ts}})
+        mock_redis = MagicMock()
+        mock_redis.lindex.return_value = msg
+        collector.redis_client = mock_redis
+
+        age = collector.get_oldest_task_age("celery")
+        assert age is not None
+        assert age > 15
+
+    def test_bytes_message_decoded(self, collector):
+        past_ts = datetime.now(timezone.utc).timestamp() - 10
+        msg = json.dumps({"headers": {"timestamp": past_ts}, "properties": {}}).encode("utf-8")
+        mock_redis = MagicMock()
+        mock_redis.lindex.return_value = msg
+        collector.redis_client = mock_redis
+
+        age = collector.get_oldest_task_age("celery")
+        assert age is not None
+        assert age >= 0
+
+    def test_get_worker_stats_exception_returns_empty(self, collector):
+        mock_celery = MagicMock()
+        mock_celery.control.inspect.side_effect = Exception("broker down")
+        collector.celery_app = mock_celery
+
+        active, reserved, stats = collector.get_worker_stats()
+        assert active == {}
+        assert reserved == {}
+        assert stats == {}

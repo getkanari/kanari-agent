@@ -4,7 +4,7 @@ Tests for doorman_agent.agent module
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -115,6 +115,33 @@ class TestCheckOnceApiMode:
         agent.check_once()
         assert agent._consecutive_failures == 1
 
+    def test_check_once_no_api_client_logs_locally(self, minimal_metrics):
+        """API mode without api_client logs locally instead of sending"""
+        config = Config(local_mode=False, api_key=None)
+        agent = DoormanAgent(config)
+        agent.collector.collect = MagicMock(return_value=minimal_metrics)
+        agent.logger.info = MagicMock()
+
+        agent.check_once()
+
+        # Should have called logger.info with a payload (local log)
+        calls = [str(c) for c in agent.logger.info.call_args_list]
+        assert any("metrics_collected" in c for c in calls)
+
+    def test_consecutive_failures_at_limit_logs_error(self, api_config, minimal_metrics):
+        """After max consecutive failures, an error is logged"""
+        agent = DoormanAgent(api_config)
+        agent._consecutive_failures = 9  # one below max (10)
+        agent.collector.collect = MagicMock(return_value=minimal_metrics)
+        agent.api_client.send_metrics = MagicMock(return_value=False)
+        agent.logger.error = MagicMock()
+
+        agent.check_once()
+
+        # Now at 10 failures — error should be logged
+        error_calls = [str(c) for c in agent.logger.error.call_args_list]
+        assert any("consecutive" in c.lower() for c in error_calls)
+
     def test_multiple_failures_accumulate(self, api_config, minimal_metrics):
         agent = DoormanAgent(api_config)
         agent.collector.collect = MagicMock(return_value=minimal_metrics)
@@ -167,3 +194,83 @@ class TestLogMetricsLocally:
         assert payload["metrics"]["total_active"] == 2
         assert len(payload["queues"]) == 1
         assert payload["queues"][0]["name"] == "celery"
+
+
+# ---------------------------------------------------------------------------
+# run
+# ---------------------------------------------------------------------------
+
+
+class TestRun:
+    def _make_agent(self, config):
+        agent = DoormanAgent(config)
+        agent.collector.connect = MagicMock(return_value=True)
+        agent.collector.get_queues_to_monitor = MagicMock(return_value=["celery"])
+        return agent
+
+    def test_run_local_mode_executes_one_cycle_then_stops(self, local_config, minimal_metrics):
+        agent = self._make_agent(local_config)
+
+        def stop_after_first(*args, **kwargs):
+            agent.running = False
+            return minimal_metrics
+
+        agent.check_once = MagicMock(side_effect=stop_after_first)
+
+        with patch("time.sleep"):
+            agent.run()
+
+        agent.check_once.assert_called_once()
+
+    def test_run_exits_if_connect_fails(self, local_config):
+        agent = DoormanAgent(local_config)
+        agent.collector.connect = MagicMock(return_value=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            agent.run()
+        assert exc_info.value.code == 1
+
+    def test_run_api_mode_validates_key_and_exits_on_failure(self, api_config):
+        agent = self._make_agent(api_config)
+        agent.api_client.validate_api_key = MagicMock(return_value=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            agent.run()
+        assert exc_info.value.code == 1
+
+    def test_run_api_mode_validates_key_success(self, api_config, minimal_metrics):
+        agent = self._make_agent(api_config)
+        agent.api_client.validate_api_key = MagicMock(return_value=True)
+
+        def stop_after_first(*args, **kwargs):
+            agent.running = False
+            return minimal_metrics
+
+        agent.check_once = MagicMock(side_effect=stop_after_first)
+
+        with patch("time.sleep"):
+            agent.run()
+
+        agent.api_client.validate_api_key.assert_called_once()
+
+    def test_run_handles_exception_in_check_cycle(self, local_config):
+        agent = self._make_agent(local_config)
+        call_count = 0
+
+        def raise_then_stop(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("transient error")
+            agent.running = False
+
+        agent.check_once = MagicMock(side_effect=raise_then_stop)
+        agent.logger.error = MagicMock()
+
+        with patch("time.sleep"):
+            agent.run()
+
+        # Should have continued after the exception
+        assert call_count == 2
+        error_calls = [str(c) for c in agent.logger.error.call_args_list]
+        assert any("Error in check cycle" in c for c in error_calls)
