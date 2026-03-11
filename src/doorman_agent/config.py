@@ -20,7 +20,7 @@ try:
 
     YAML_AVAILABLE = True
 except ImportError:
-    yaml = None
+    yaml = None  # type: ignore[assignment]
     YAML_AVAILABLE = False
 
 

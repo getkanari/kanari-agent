@@ -113,9 +113,7 @@ class TestSanitizeTaskSignature:
         assert "john" not in result
 
     def test_uuid_replaced(self, client):
-        result = client._sanitize_task_signature(
-            "order_550e8400-e29b-41d4-a716-446655440000"
-        )
+        result = client._sanitize_task_signature("order_550e8400-e29b-41d4-a716-446655440000")
         assert "[uuid]" in result
         assert "550e8400" not in result
 
@@ -134,9 +132,7 @@ class TestSanitizeTaskSignature:
         assert client_no_sanitize._sanitize_task_signature(name) == name
 
     def test_uuid_case_insensitive(self, client):
-        result = client._sanitize_task_signature(
-            "task_550E8400-E29B-41D4-A716-446655440000"
-        )
+        result = client._sanitize_task_signature("task_550E8400-E29B-41D4-A716-446655440000")
         assert "[uuid]" in result
 
     @pytest.mark.parametrize(
@@ -166,9 +162,7 @@ class TestSanitizeQueueName:
         assert "john" not in result
 
     def test_uuid_in_queue_replaced(self, client):
-        result = client._sanitize_queue_name(
-            "tenant-550e8400-e29b-41d4-a716-446655440000"
-        )
+        result = client._sanitize_queue_name("tenant-550e8400-e29b-41d4-a716-446655440000")
         assert "[uuid]" in result
 
 

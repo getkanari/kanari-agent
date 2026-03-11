@@ -25,7 +25,7 @@ class StructuredLogger:
             self.logger.addHandler(handler)
 
     class _JsonFormatter(logging.Formatter):
-        def format(self, record):
+        def format(self, record: logging.LogRecord) -> str:
             log_obj = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": record.levelname,
@@ -36,22 +36,22 @@ class StructuredLogger:
                 log_obj.update(record.extra_fields)
             return json.dumps(log_obj)
 
-    def _log(self, level: int, message: str, **kwargs):
+    def _log(self, level: int, message: str, **kwargs: object) -> None:
         record = self.logger.makeRecord(self.name, level, "", 0, message, (), None)
-        record.extra_fields = kwargs
+        record.extra_fields = kwargs  # type: ignore[attr-defined]
         self.logger.handle(record)
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **kwargs: object) -> None:
         self._log(logging.INFO, message, **kwargs)
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **kwargs: object) -> None:
         self._log(logging.WARNING, message, **kwargs)
 
-    def error(self, message: str, **kwargs):
+    def error(self, message: str, **kwargs: object) -> None:
         self._log(logging.ERROR, message, **kwargs)
 
-    def critical(self, message: str, **kwargs):
+    def critical(self, message: str, **kwargs: object) -> None:
         self._log(logging.CRITICAL, message, **kwargs)
 
-    def debug(self, message: str, **kwargs):
+    def debug(self, message: str, **kwargs: object) -> None:
         self._log(logging.DEBUG, message, **kwargs)

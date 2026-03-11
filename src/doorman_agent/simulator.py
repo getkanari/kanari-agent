@@ -17,7 +17,7 @@ try:
 
     REDIS_AVAILABLE = True
 except ImportError:
-    redis = None
+    redis = None  # type: ignore[assignment]
     REDIS_AVAILABLE = False
 
 
@@ -92,7 +92,7 @@ def zombie_task():
 
     def start_redis(self) -> bool:
         """Starts a local Redis server"""
-        import subprocess
+        import subprocess  # nosec B404 — dev/demo tool; subprocess is intentional
 
         if not self._check_redis_server():
             self.logger.error(
@@ -102,7 +102,7 @@ def zombie_task():
             return False
 
         try:
-            self.redis_process = subprocess.Popen(
+            self.redis_process = subprocess.Popen(  # nosec B603, B607 — dev tool; fixed args, no user input
                 [
                     "redis-server",
                     "--port",
@@ -136,7 +136,7 @@ def zombie_task():
 
     def start_workers(self) -> bool:
         """Starts Celery workers"""
-        import subprocess
+        import subprocess  # nosec B404 — dev/demo tool; subprocess is intentional
 
         if self.num_workers <= 0:
             self.logger.info("No workers requested (simulating workers down scenario)")
@@ -146,12 +146,12 @@ def zombie_task():
 
         try:
             for i in range(self.num_workers):
-                worker_name = f"sim_worker_{i+1}"
+                worker_name = f"sim_worker_{i + 1}"
 
                 env_vars: dict[str, str] = {k: v for k, v in os.environ.items() if v is not None}
                 env_vars["PYTHONPATH"] = self.temp_dir or ""
 
-                process = subprocess.Popen(
+                process = subprocess.Popen(  # nosec B603 — dev tool; fixed args, no user input
                     [
                         sys.executable,
                         "-m",
@@ -228,7 +228,7 @@ def zombie_task():
         config.thresholds.max_wait_time_seconds = 30
         return config
 
-    def stop(self):
+    def stop(self) -> None:
         """Stops all simulation processes"""
         for process in self.worker_processes:
             try:
@@ -237,7 +237,7 @@ def zombie_task():
             except Exception:
                 try:
                     process.kill()
-                except Exception:
+                except Exception:  # nosec B110 — best-effort process cleanup
                     pass
 
         if self.redis_process:
@@ -247,7 +247,7 @@ def zombie_task():
             except Exception:
                 try:
                     self.redis_process.kill()
-                except Exception:
+                except Exception:  # nosec B110 — best-effort process cleanup
                     pass
 
         if self.temp_dir and os.path.exists(self.temp_dir):
@@ -258,7 +258,7 @@ def zombie_task():
         self.logger.info("Simulation environment stopped")
 
 
-def run_simulation(num_workers: int, enqueue_tasks_count: int = 0):
+def run_simulation(num_workers: int, enqueue_tasks_count: int = 0) -> None:
     """
     Runs Doorman in simulation mode with local Redis and configurable workers.
 

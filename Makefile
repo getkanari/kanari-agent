@@ -19,6 +19,9 @@ install: ## Install all dependencies (including dev)
 test: ## Run tests with coverage (fails below 80%)
 	poetry run pytest --cov=doorman_agent --cov-report=term-missing --cov-fail-under=80
 
+test-path: ## Run tests with path
+	poetry run pytest $(path) -s
+
 lint: ## Run ruff linter
 	poetry run ruff check .
 
@@ -28,7 +31,11 @@ format: ## Auto-format code with ruff
 typecheck: ## Run mypy type checker
 	poetry run mypy src/doorman_agent
 
-check: lint typecheck test ## Run lint + typecheck + tests (full CI gate)
+security: ## Run security scan (bandit + detect-secrets)
+	poetry run bandit -c pyproject.toml -r src/doorman_agent
+	poetry run detect-secrets-hook --baseline .secrets.baseline
+
+check: lint typecheck security test ## Run lint + typecheck + security + tests (full CI gate)
 
 # ── Build & Publish ──────────────────────────────────────────────────────────
 build: ## Build wheel and sdist

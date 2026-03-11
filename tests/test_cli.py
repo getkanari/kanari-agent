@@ -42,8 +42,9 @@ class TestCliLocalOnce:
         mock_agent.collector.connect.return_value = True
         mock_agent.check_once.return_value = _minimal_metrics()
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.agent.DoormanAgent", return_value=mock_agent
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
         ):
             _run_main(["--local", "--once"])
 
@@ -54,8 +55,9 @@ class TestCliLocalOnce:
         mock_agent = MagicMock()
         mock_agent.collector.connect.return_value = False
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.agent.DoormanAgent", return_value=mock_agent
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
         ):
             with pytest.raises(SystemExit) as exc:
                 _run_main(["--local", "--once"])
@@ -89,9 +91,10 @@ class TestCliAudit:
     def test_audit_mode_calls_run_audit_and_exits(self):
         cfg = Config()
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.audit.run_audit", return_value=0
-        ) as mock_audit:
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.audit.run_audit", return_value=0) as mock_audit,
+        ):
             with pytest.raises(SystemExit) as exc:
                 _run_main(["--audit", "--local"])
         assert exc.value.code == 0
@@ -100,9 +103,10 @@ class TestCliAudit:
     def test_audit_deep_flag_passed(self):
         cfg = Config()
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.audit.run_audit", return_value=1
-        ) as mock_audit:
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.audit.run_audit", return_value=1) as mock_audit,
+        ):
             with pytest.raises(SystemExit):
                 _run_main(["--audit", "--deep", "--local"])
 
@@ -112,9 +116,10 @@ class TestCliAudit:
     def test_config_check_is_alias_for_deep(self):
         cfg = Config()
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.audit.run_audit", return_value=0
-        ) as mock_audit:
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.audit.run_audit", return_value=0) as mock_audit,
+        ):
             with pytest.raises(SystemExit):
                 _run_main(["--audit", "--config-check", "--local"])
 
@@ -144,8 +149,9 @@ class TestCliDaemonMode:
         cfg = Config(local_mode=True)
         mock_agent = MagicMock()
 
-        with patch("doorman_agent.config.load_config", return_value=cfg), patch(
-            "doorman_agent.agent.DoormanAgent", return_value=mock_agent
+        with (
+            patch("doorman_agent.config.load_config", return_value=cfg),
+            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
         ):
             _run_main(["--local"])
 

@@ -38,17 +38,17 @@ class DoormanAgent:
                 api_key=config.api_key, api_url=config.api_url, logger=self.logger
             )
 
-    def setup_signal_handlers(self):
+    def setup_signal_handlers(self) -> None:
         """Configures handlers for graceful shutdown"""
 
-        def handle_shutdown(signum, frame):
+        def handle_shutdown(signum: object, frame: object) -> None:
             self.logger.info("Shutdown signal received", signal=signum)
             self.running = False
 
         signal.signal(signal.SIGTERM, handle_shutdown)
         signal.signal(signal.SIGINT, handle_shutdown)
 
-    def _log_metrics_locally(self, metrics: SystemMetrics):
+    def _log_metrics_locally(self, metrics: SystemMetrics) -> None:
         """Logs metrics in structured format (for local mode)"""
         if self.api_client:
             payload = self.api_client.build_payload(metrics)
@@ -136,7 +136,7 @@ class DoormanAgent:
 
         return metrics
 
-    def run(self):
+    def run(self) -> None:
         """Runs the main agent loop"""
         mode = "local" if self.config.local_mode else "api"
 

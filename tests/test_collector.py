@@ -173,9 +173,7 @@ class TestGetQueuesToMonitor:
     def test_caches_discovered_queues(self, collector_no_queues):
         mock_celery = MagicMock()
         mock_inspector = MagicMock()
-        mock_inspector.active_queues.return_value = {
-            "celery@worker-1": [{"name": "jobs"}]
-        }
+        mock_inspector.active_queues.return_value = {"celery@worker-1": [{"name": "jobs"}]}
         mock_celery.control.inspect.return_value = mock_inspector
         collector_no_queues.celery_app = mock_celery
 
@@ -248,11 +246,7 @@ class TestCollect:
         self._setup_celery(
             collector,
             active={"celery@worker-1": [{"id": "t1", "name": "task"}]},
-            stats={
-                "celery@worker-1": {
-                    "pool": {"max-concurrency": 4}
-                }
-            },
+            stats={"celery@worker-1": {"pool": {"max-concurrency": 4}}},
         )
 
         metrics = collector.collect()
@@ -278,9 +272,7 @@ class TestCollect:
         self._setup_celery(
             collector,
             active={
-                "celery@worker-1": [
-                    {"id": "stuck-1", "name": "long_task", "time_start": old_start}
-                ]
+                "celery@worker-1": [{"id": "stuck-1", "name": "long_task", "time_start": old_start}]
             },
             stats={"celery@worker-1": {"pool": {"max-concurrency": 4}}},
         )
@@ -319,10 +311,11 @@ class TestConnect:
         mock_redis_mod.from_url.return_value = mock_redis_instance
         mock_celery_class = MagicMock()
 
-        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
-            "doorman_agent.collector.CELERY_AVAILABLE", True
-        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
-            "doorman_agent.collector.Celery", mock_celery_class
+        with (
+            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
+            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
+            patch("doorman_agent.collector.redis", mock_redis_mod),
+            patch("doorman_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -334,10 +327,11 @@ class TestConnect:
         mock_redis_mod.from_url.side_effect = Exception("connection refused")
         mock_celery_class = MagicMock()
 
-        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
-            "doorman_agent.collector.CELERY_AVAILABLE", True
-        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
-            "doorman_agent.collector.Celery", mock_celery_class
+        with (
+            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
+            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
+            patch("doorman_agent.collector.redis", mock_redis_mod),
+            patch("doorman_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -350,10 +344,11 @@ class TestConnect:
         mock_celery_class = MagicMock()
         mock_celery_class.side_effect = Exception("broker error")
 
-        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
-            "doorman_agent.collector.CELERY_AVAILABLE", True
-        ), patch("doorman_agent.collector.redis", mock_redis_mod), patch(
-            "doorman_agent.collector.Celery", mock_celery_class
+        with (
+            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
+            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
+            patch("doorman_agent.collector.redis", mock_redis_mod),
+            patch("doorman_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -361,9 +356,11 @@ class TestConnect:
 
     def test_connect_redis_not_available(self, collector):
         mock_celery_class = MagicMock()
-        with patch("doorman_agent.collector.REDIS_AVAILABLE", False), patch(
-            "doorman_agent.collector.CELERY_AVAILABLE", True
-        ), patch("doorman_agent.collector.Celery", mock_celery_class):
+        with (
+            patch("doorman_agent.collector.REDIS_AVAILABLE", False),
+            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
+            patch("doorman_agent.collector.Celery", mock_celery_class),
+        ):
             result = collector.connect()
 
         assert result is False
@@ -371,9 +368,11 @@ class TestConnect:
     def test_connect_celery_not_available(self, collector):
         mock_redis_mod = MagicMock()
         mock_redis_mod.from_url.return_value = MagicMock()
-        with patch("doorman_agent.collector.REDIS_AVAILABLE", True), patch(
-            "doorman_agent.collector.CELERY_AVAILABLE", False
-        ), patch("doorman_agent.collector.redis", mock_redis_mod):
+        with (
+            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
+            patch("doorman_agent.collector.CELERY_AVAILABLE", False),
+            patch("doorman_agent.collector.redis", mock_redis_mod),
+        ):
             result = collector.connect()
 
         assert result is False

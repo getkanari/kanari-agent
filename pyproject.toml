@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "doorman-agent"
-version = "0.1.0a3"
+version = "0.1.0a4.dev1"
 description = "Privacy-first monitoring agent for Celery + Redis"
 authors = ["Hernán Chilabert <hchilabert@gmail.com>"]
 readme = "README.md"
@@ -82,6 +82,12 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.bandit]
+targets = ["src/doorman_agent"]
+skips = ["B101"]
+severity = "medium"
+confidence = "medium"
 
 [tool.coverage.run]
 omit = ["*/simulator.py"]

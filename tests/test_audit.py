@@ -95,12 +95,8 @@ class TestIsQueueCongested:
 
 class TestCalculateTrends:
     def _make_samples(self, depths_start: dict, depths_end: dict) -> list[SystemMetrics]:
-        first = _metrics(
-            queues=[QueueMetrics(name=k, depth=v) for k, v in depths_start.items()]
-        )
-        last = _metrics(
-            queues=[QueueMetrics(name=k, depth=v) for k, v in depths_end.items()]
-        )
+        first = _metrics(queues=[QueueMetrics(name=k, depth=v) for k, v in depths_start.items()])
+        last = _metrics(queues=[QueueMetrics(name=k, depth=v) for k, v in depths_end.items()])
         return [first, last]
 
     def test_empty_result_for_single_sample(self):
@@ -665,8 +661,9 @@ class TestRunAudit:
 
         config = Config()
         # MetricsCollector and Console are lazy-imported inside run_audit()
-        with patch("doorman_agent.collector.MetricsCollector") as mock_cls, patch(
-            "rich.console.Console", return_value=_console()
+        with (
+            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = self._mock_collector(connect_ok=False)
             result = run_audit(config)
@@ -684,8 +681,9 @@ class TestRunAudit:
             alive_workers=2,
             total_workers=2,
         )
-        with patch("doorman_agent.collector.MetricsCollector") as mock_cls, patch(
-            "rich.console.Console", return_value=_console()
+        with (
+            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = self._mock_collector(connect_ok=True, metrics=metrics)
             result = run_audit(config, samples=1)
@@ -705,8 +703,9 @@ class TestRunAudit:
         collector.redis_client = None
         collector.celery_app = None
 
-        with patch("doorman_agent.collector.MetricsCollector") as mock_cls, patch(
-            "rich.console.Console", return_value=_console()
+        with (
+            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = collector
             result = run_audit(config, deep=True)

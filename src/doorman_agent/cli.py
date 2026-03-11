@@ -10,7 +10,7 @@ import sys
 from doorman_agent.config import AGENT_VERSION
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Doorman Agent - Celery/Redis Monitoring Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,

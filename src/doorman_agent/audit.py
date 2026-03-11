@@ -118,9 +118,7 @@ def run_audit(
                     description=f"Collecting sample {i + 1}/{samples}...", total=None
                 )
             else:
-                task = progress.add_task(
-                    description="Collecting metrics...", total=None
-                )
+                task = progress.add_task(description="Collecting metrics...", total=None)
 
             if i > 0:
                 time.sleep(interval)
@@ -214,14 +212,12 @@ def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
                             message=f"{usage_pct:.1f}% used",
                         )
                     )
-    except Exception:
+    except Exception:  # nosec B110 — Redis CONFIG GET may be disabled; skip gracefully
         pass  # Skip if no permission
 
     try:
         # Check maxmemory-policy
-        policy = redis_client.config_get("maxmemory-policy").get(
-            "maxmemory-policy", "noeviction"
-        )
+        policy = redis_client.config_get("maxmemory-policy").get("maxmemory-policy", "noeviction")
         if policy == "noeviction":
             checks.append(
                 ConfigCheck(
@@ -239,7 +235,7 @@ def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
                     message=policy,
                 )
             )
-    except Exception:
+    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
         pass
 
     try:
@@ -262,7 +258,7 @@ def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
                     message="Enabled",
                 )
             )
-    except Exception:
+    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
         pass
 
     try:
@@ -291,7 +287,7 @@ def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
                         message=f"{connected}/{max_clients} connections",
                     )
                 )
-    except Exception:
+    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
         pass
 
     return checks
@@ -307,7 +303,7 @@ def _check_celery_config(celery_app: Any, metrics: SystemMetrics) -> list[Config
 
         if conf:
             # Get first worker's config (they should all be the same)
-            worker_conf = next(iter(conf.values()), {})
+            worker_conf: dict = next(iter(conf.values()), {})
 
             # Check task_acks_late
             acks_late = worker_conf.get("task_acks_late", False)
@@ -369,7 +365,7 @@ def _check_celery_config(celery_app: Any, metrics: SystemMetrics) -> list[Config
                     )
                 )
 
-    except Exception:
+    except Exception:  # nosec B110 — Celery inspect may be unavailable; skip gracefully
         pass
 
     return checks
@@ -506,9 +502,7 @@ def _analyze_metrics(
     dead_workers = metrics.total_workers - metrics.alive_workers
     if dead_workers > 0:
         capacity_lost = (
-            (dead_workers / metrics.total_workers) * 100
-            if metrics.total_workers > 0
-            else 0
+            (dead_workers / metrics.total_workers) * 100 if metrics.total_workers > 0 else 0
         )
         result.criticals.append(
             f"{dead_workers} worker(s) offline = {capacity_lost:.0f}% capacity lost"
@@ -525,9 +519,7 @@ def _analyze_metrics(
         if w.is_alive and w.concurrency > 0 and w.active_tasks >= w.concurrency
     ]
     if workers_at_capacity:
-        result.warnings.append(
-            f"{len(workers_at_capacity)} worker(s) at full capacity"
-        )
+        result.warnings.append(f"{len(workers_at_capacity)} worker(s) at full capacity")
         if result.exit_code < EXIT_WARNING:
             result.exit_code = EXIT_WARNING
 
@@ -556,8 +548,7 @@ def _analyze_metrics(
     # If we have more pending tasks than our total capacity and workers are mostly idle,
     # something is wrong (workers not picking up tasks)
     has_significant_backlog = (
-        metrics.total_concurrency > 0
-        and metrics.total_pending_tasks > metrics.total_concurrency
+        metrics.total_concurrency > 0 and metrics.total_pending_tasks > metrics.total_concurrency
     )
     low_saturation = metrics.saturation_pct < 50
 
@@ -577,9 +568,7 @@ def _analyze_metrics(
     # Check for trends indicating growing queues
     for trend in result.queue_trends:
         if trend.trend == "growing" and trend.depth_delta > 10:
-            result.warnings.append(
-                f"Queue '{trend.name}' growing: +{trend.depth_delta} tasks"
-            )
+            result.warnings.append(f"Queue '{trend.name}' growing: +{trend.depth_delta} tasks")
             if result.exit_code < EXIT_WARNING:
                 result.exit_code = EXIT_WARNING
 
@@ -597,9 +586,7 @@ def _analyze_metrics(
     # Check saturation
     if metrics.saturation_pct > 90:
         result.warnings.append(f"High saturation ({metrics.saturation_pct:.1f}%)")
-        result.recommendations.append(
-            "Consider adding more workers — saturation above 90%"
-        )
+        result.recommendations.append("Consider adding more workers — saturation above 90%")
         if result.exit_code < EXIT_WARNING:
             result.exit_code = EXIT_WARNING
 
@@ -622,7 +609,7 @@ def _print_report(
     samples: int,
     elapsed: float,
     deep: bool,
-):
+) -> None:
     """Print the formatted audit report using rich"""
     from rich.panel import Panel
     from rich.table import Table
@@ -675,17 +662,13 @@ def _print_report(
 
         for w in metrics.workers:
             slots = (
-                f"{w.active_tasks}/{w.concurrency}"
-                if w.concurrency > 0
-                else f"{w.active_tasks}"
+                f"{w.active_tasks}/{w.concurrency}" if w.concurrency > 0 else f"{w.active_tasks}"
             )
 
             if not w.is_alive:
                 table.add_row("[red]❌[/red]", w.name, slots, "[red]offline[/red]")
             elif w.concurrency > 0 and w.active_tasks >= w.concurrency:
-                table.add_row(
-                    "[yellow]⚠️[/yellow]", w.name, slots, "[yellow]at capacity[/yellow]"
-                )
+                table.add_row("[yellow]⚠️[/yellow]", w.name, slots, "[yellow]at capacity[/yellow]")
             else:
                 table.add_row("[green]✅[/green]", w.name, slots, "[green]online[/green]")
 
@@ -791,9 +774,7 @@ def _print_report(
                 f"  ⏱️  Max Latency: [red]{metrics.max_latency_sec:.1f}s[/red] ({max_latency_queue})"
             )
         else:
-            console.print(
-                f"  ⏱️  Max Latency: {metrics.max_latency_sec:.1f}s ({max_latency_queue})"
-            )
+            console.print(f"  ⏱️  Max Latency: {metrics.max_latency_sec:.1f}s ({max_latency_queue})")
     elif metrics.total_pending_tasks > 0:
         # Has pending tasks but can't measure latency
         console.print("  ⏱️  Max Latency: [yellow]unknown[/yellow] (timestamps not available)")
@@ -802,7 +783,9 @@ def _print_report(
 
     # Total pending
     pending_color = "red" if metrics.total_pending_tasks > 100 else "default"
-    console.print(f"  📋 Total Pending: [{pending_color}]{metrics.total_pending_tasks:,}[/{pending_color}] tasks")
+    console.print(
+        f"  📋 Total Pending: [{pending_color}]{metrics.total_pending_tasks:,}[/{pending_color}] tasks"
+    )
 
     # Anomalies section
     if metrics.stuck_tasks:

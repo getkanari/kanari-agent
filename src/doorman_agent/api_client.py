@@ -143,11 +143,9 @@ class APIClient:
 
         try:
             data = json.dumps(payload).encode("utf-8") if payload else None
-            req = urllib.request.Request(
-                url, data=data, headers=self._get_headers(), method=method
-            )
+            req = urllib.request.Request(url, data=data, headers=self._get_headers(), method=method)
 
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=30) as response:  # nosec B310 — HTTPS only, URL is always https://api.doorman.com
                 response_data = json.loads(response.read().decode("utf-8"))
                 return True, response_data
 
@@ -155,7 +153,7 @@ class APIClient:
             error_body = None
             try:
                 error_body = json.loads(e.read().decode("utf-8"))
-            except Exception:
+            except Exception:  # nosec B110 — best-effort error body parsing, failure is safe
                 pass
 
             self.logger.error(

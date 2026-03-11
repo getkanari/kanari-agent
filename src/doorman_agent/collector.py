@@ -18,7 +18,7 @@ try:
 
     REDIS_AVAILABLE = True
 except ImportError:
-    redis = None
+    redis = None  # type: ignore[assignment]
     REDIS_AVAILABLE = False
 
 try:
@@ -129,9 +129,7 @@ class MetricsCollector:
 
         # Fallback to default "celery" queue if nothing discovered
         if not self._discovered_queues:
-            self.logger.warning(
-                "No queues configured or discovered, using default 'celery' queue"
-            )
+            self.logger.warning("No queues configured or discovered, using default 'celery' queue")
             return ["celery"]
 
         return self._discovered_queues

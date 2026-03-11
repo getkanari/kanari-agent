@@ -50,6 +50,12 @@ jobs:
       - name: Type check (mypy)
         run: poetry run mypy src/doorman_agent
 
+      - name: Security scan (bandit)
+        run: poetry run bandit -c pyproject.toml -r src/doorman_agent
+
+      - name: Secrets scan (detect-secrets)
+        run: poetry run detect-secrets-hook --baseline .secrets.baseline
+
       - name: Run tests with coverage
         run: poetry run pytest --cov=doorman_agent --cov-report=xml --cov-fail-under=80
 
