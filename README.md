@@ -8,6 +8,8 @@ pip install doorman-agent && doorman-agent --local
 
 That's it. You're monitoring.
 
+> ⚠️ **Alpha Notice:** Doorman is currently in alpha (`0.1.0a`). The API and dashboard at doorman.com are not yet publicly available.
+
 ---
 
 ## Why Doorman?
@@ -77,7 +79,7 @@ Even metadata is sanitized before leaving your infrastructure:
 
 ```bash
 # Run in local mode - see exactly what would be sent
-doorman-agent --local | jq '.payload'
+doorman-agent --local | jq '.'
 ```
 
 ---
@@ -90,7 +92,7 @@ doorman-agent --local | jq '.payload'
 pip install doorman-agent
 ```
 
-### 2. Test locally (no API, no data sent anywhere)
+### 2. Test locally (no API key, no data sent anywhere)
 
 ```bash
 REDIS_URL=redis://localhost:6379/0 doorman-agent --local
@@ -99,8 +101,8 @@ REDIS_URL=redis://localhost:6379/0 doorman-agent --local
 ### 3. Connect to Doorman (when ready)
 
 ```bash
-export DOORMAN_API_KEY=your-api-key  # Not ready yet
-doorman-agent
+export DOORMAN_API_KEY=your-api-key
+doorman-agent --config config.yaml
 ```
 
 ---
@@ -112,35 +114,36 @@ doorman-agent
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DOORMAN_API_KEY` | Your API key | Required (API mode) |
-| `REDIS_URL` | Redis connection | `redis://localhost:6379/0` |
-| `CELERY_BROKER_URL` | Celery broker | Same as REDIS_URL |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
+| `CELERY_BROKER_URL` | Celery broker URL | Same as `REDIS_URL` |
 | `DOORMAN_LOCAL_MODE` | `true` = no API calls | `false` |
 | `CHECK_INTERVAL` | Seconds between checks | `30` |
 
 ### Config File (optional)
 
+Copy `config.example.yaml` and adjust:
+
 ```yaml
-# doorman.yaml
 redis_url: redis://prod-redis:6379/1
 celery_broker_url: redis://prod-redis:6379/1
 check_interval_seconds: 15
 
-# Queues to monitor (empty = auto-discover)
+# Queues to monitor (empty = auto-discover from workers)
 monitored_queues: []
 
 # Privacy settings
 privacy:
   sanitize_task_signatures: true  # default: true
 
-# Alert thresholds (used by API)
+# Alert thresholds
 thresholds:
   max_queue_size: 1000
   max_wait_time_seconds: 60
-  max_task_runtime_seconds: 1800
+  max_task_runtime_seconds: 1800  # 30 minutes
 ```
 
 ```bash
-doorman-agent --config doorman.yaml
+doorman-agent --config config.yaml
 ```
 
 ---
@@ -193,17 +196,22 @@ saturation_pct = (active_tasks / total_concurrency) × 100
 
 ```bash
 # Run continuously (production)
-doorman-agent --config doorman.yaml
+doorman-agent --config config.yaml
 
-# Run once (testing/CI)
+# Run once (for testing or CI)
 doorman-agent --once --local
 
-# See exactly what data is collected
-doorman-agent --local | jq '.'
+# Run continuously in local mode (no API calls)
+doorman-agent --local
 
-# Simulation mode (demo without real Redis/Celery)
-doorman-agent --simulate --workers 2
-doorman-agent --simulate --workers 0 --enqueue 50  # Simulate outage
+# One-time health check with formatted report
+doorman-agent --audit
+
+# Deep audit: includes Redis/Celery configuration analysis
+doorman-agent --audit --deep
+
+# Trend detection: collect 3 samples 10 seconds apart
+doorman-agent --audit --samples 3 --interval 10
 ```
 
 ---
@@ -264,7 +272,6 @@ Metrics
 Use multiple samples to detect if queues are growing or shrinking:
 
 ```bash
-# Collect 3 samples, 10 seconds apart
 doorman-agent --audit --samples 3 --interval 10
 ```
 
@@ -284,68 +291,12 @@ Trends (over 3 samples)
   • Possible ghost workers: 'emails' growing but saturation is low (25.0%)
 ```
 
-This helps diagnose:
-- **Growing + high saturation** → Need more workers
-- **Growing + low saturation** → Ghost workers (workers not picking up tasks)
-
 ### Deep Configuration Analysis
-
-Run `--deep` to analyze your Redis and Celery configuration:
 
 ```bash
 doorman-agent --audit --deep
-# or
+# or alias:
 doorman-agent --audit --config-check
-```
-
-**Sample output:**
-
-```
-🔍 Doorman Audit
-════════════════════════════════════════════════════════════
-
-✅ System: HEALTHY
-
-Infrastructure
-  ✅ Redis: connected
-  ✅ Celery: connected (2 workers)
-
-Workers
-  Status  Worker                  Slots  Note
-  ✅      celery@worker-1         2/4    online
-  ✅      celery@worker-2         1/4    online
-
-Queues
-  Status  Queue          Pending  Latency  Trend
-  ✅      celery         0        0s       →
-
-Metrics
-  📊 Saturation: 18.8% (3/16 slots, headroom: 13 slots)
-  ⏱️  Max Latency: 0s (SLA Safe ✓)
-  📋 Total Pending: 0 tasks
-
-Configuration Analysis
-  Status  Check                           Result
-  ⚠️      Redis maxmemory                 Not set (risk of OOM)
-  ⚠️      Redis eviction policy           noeviction (writes fail when full)
-  ✅      Redis persistence               Enabled
-  ✅      Redis connection pool           12/10000 connections
-  ⚠️      Celery task_acks_late           False (task loss if worker dies)
-  ⚠️      Celery task_reject_on_worker_lost  False (silent task loss)
-  ⚠️      Celery prefetch_multiplier      4 (may cause uneven distribution)
-  ✅      Worker redundancy               2 workers (redundant)
-
-════════════════════════════════════════════════════════════
-💡 Recommendations:
-  • Redis maxmemory: CONFIG SET maxmemory 2gb
-  • Redis eviction policy: CONFIG SET maxmemory-policy volatile-lru
-  • Celery task_acks_late: Set task_acks_late=True in Celery config
-  • Celery task_reject_on_worker_lost: Set task_reject_on_worker_lost=True
-  • Celery prefetch_multiplier: Set worker_prefetch_multiplier=1 for long tasks
-
-════════════════════════════════════════════════════════════
-✅ All systems healthy
-Audit completed in 2.3s
 ```
 
 **Checks included:**
@@ -369,7 +320,7 @@ Audit completed in 2.3s
 - **TLS only** — All API communication over HTTPS
 - **API key scoped** — Keys are project-specific, revocable
 - **No shell access** — Agent has no remote execution capability
-- **Auditable** — Run `--local` to inspect all collected data
+- **Auditable** — Run `--local` to inspect all collected data before sending anything
 
 ### Disabling task signature sanitization
 
@@ -380,12 +331,6 @@ privacy:
   sanitize_task_signatures: false
 ```
 
-Or via environment:
-
-```bash
-DOORMAN_SANITIZE_TASK_SIGNATURES=false doorman-agent
-```
-
 ---
 
 ## Requirements
@@ -393,6 +338,53 @@ DOORMAN_SANITIZE_TASK_SIGNATURES=false doorman-agent
 - Python 3.9+
 - Redis
 - Celery 5.2+
+
+---
+
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/herchila/doorman-agent
+cd doorman-agent
+poetry install --with dev
+pre-commit install
+```
+
+### Commands
+
+```bash
+make test        # Run tests with coverage (minimum 80%)
+make lint        # Ruff linter
+make format      # Auto-format with ruff
+make typecheck   # mypy type checker
+make security    # bandit + detect-secrets
+make check       # Full CI gate (lint + typecheck + security + tests)
+```
+
+### Running against real infrastructure
+
+Use [doorman-chaosmonkey](https://github.com/herchila/doorman-chaosmonkey) to spin up a local Celery + Redis environment with configurable failure scenarios:
+
+```bash
+# In doorman-chaosmonkey: start Redis + 4 workers
+make up
+
+# In doorman-agent: point to that environment
+REDIS_URL=redis://localhost:6379/1 \
+CELERY_BROKER_URL=redis://localhost:6379/1 \
+  poetry run doorman-agent --audit
+```
+
+### CI/CD
+
+GitHub Actions runs on every push:
+- Lint, format check, type check, security scan
+- Tests with coverage (fails below 80%)
+- Matrix: Python 3.9, 3.10, 3.11, 3.12
+
+Publishing to PyPI is triggered by `v*` tags via Trusted Publishing (OIDC) — no API tokens stored in GitHub Secrets.
 
 ---
 
@@ -406,18 +398,7 @@ The agent collects metrics. The Doorman API analyzes them and sends alerts.
 - Email
 - Webhooks
 
-> ⚠️ **Alpha Notice:** Doorman is currently in alpha. The API and dashboard at doorman.com are not yet publicly available. <!-- [Join the waitlist](https://doorman.com) to get early access. -->
-
 ---
-
-<!-- ## Support
-
-- 📖 Docs: [docs.doorman.com](https://docs.doorman.com)
-- 💬 Discord: [discord.gg/doorman](https://discord.gg/doorman)
-- 🐛 Issues: [GitHub Issues](https://github.com/doorman-io/doorman-agent/issues)
-- 📧 Security: security@doorman.com
-
---- -->
 
 ## License
 

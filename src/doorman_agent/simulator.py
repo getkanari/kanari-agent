@@ -32,7 +32,7 @@ class SimulationEnvironment:
         self.logger = logger
         self.redis_process: Optional[Any] = None
         self.worker_processes: list[Any] = []
-        self.redis_port = 6399  # Non-standard port to avoid conflicts
+        self.redis_port = 6379  # Non-standard port to avoid conflicts
         self.temp_dir: Optional[str] = None
 
     def _check_redis_server(self) -> bool:

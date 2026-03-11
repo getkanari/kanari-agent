@@ -1,9 +1,5 @@
-.PHONY: help install test lint format typecheck check build publish clean \
-        run run-once run-local run-simulate
-
-# ── Variables ────────────────────────────────────────────────────────────────
-workers ?= 1
-enqueue ?= 0
+.PHONY: help install test test-path lint format typecheck check build publish clean \
+        run run-once run-local
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 help: ## Show this help message
@@ -59,9 +55,6 @@ run-once: ## Run agent once in local mode
 
 run-local: ## Run agent continuously in local mode (no API calls)
 	poetry run doorman-agent --config config.yaml --local
-
-run-simulate: ## Run simulation (usage: make run-simulate workers=2 enqueue=10)
-	poetry run doorman-agent --simulate --workers $(workers) --enqueue $(enqueue)
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts and cache files
