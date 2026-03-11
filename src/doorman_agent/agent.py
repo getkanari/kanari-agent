@@ -7,7 +7,6 @@ from __future__ import annotations
 import signal
 import sys
 import time
-from typing import Optional
 
 from doorman_agent.api_client import APIClient
 from doorman_agent.collector import MetricsCollector
@@ -31,7 +30,7 @@ class DoormanAgent:
         self.running = False
         self._consecutive_failures = 0
         self._max_consecutive_failures = 10
-        self.api_client: Optional[APIClient] = None
+        self.api_client: APIClient | None = None
 
         # Initialize API client only if not in local mode and API key provided
         if not config.local_mode and config.api_key:

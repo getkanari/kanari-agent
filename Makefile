@@ -3,6 +3,10 @@
 help:
 	@echo "Available commands:"
 	@echo "  make clean - Clean temporary files"
+	@echo "  make run - Run the application"
+	@echo "  make run_once - Run the application once"
+	@echo "  make run_dry_run - Run the application in dry run mode"
+	@echo "  make run_simulate - Run the application in simulation mode"
 
 clean: ## Clean temporary files
 	find . -type f -name "*.pyc" -delete

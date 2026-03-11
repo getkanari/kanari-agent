@@ -2,11 +2,12 @@
 Tests for doorman_agent.config module
 """
 
-import os
-import pytest
 from pathlib import Path
+
+import pytest
+
 from doorman_agent.config import load_config
-from doorman_agent.models import Config, AlertThresholds
+from doorman_agent.models import AlertThresholds, Config
 
 
 # Fixture to clean environment variables before each test

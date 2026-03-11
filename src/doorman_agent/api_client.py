@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 from doorman_agent.config import AGENT_VERSION
 from doorman_agent.logger import StructuredLogger
@@ -31,9 +31,9 @@ class APIClient:
     def __init__(
         self,
         api_key: str,
-        api_url: Optional[str] = None,
-        logger: Optional[StructuredLogger] = None,
-        config: Optional[Config] = None,
+        api_url: str | None = None,
+        logger: StructuredLogger | None = None,
+        config: Config | None = None,
     ):
         self.api_key = api_key
         self.api_url = (api_url or self.DEFAULT_API_URL).rstrip("/")
@@ -73,7 +73,7 @@ class APIClient:
     def _sanitize_task_signature(self, task_name: str) -> str:
         """
         Sanitize task signature to remove potential PII.
-        
+
         Examples:
             'app.tasks.send_email' -> 'app.tasks.send_email' (no change)
             'app.tasks.process_user_12345' -> 'app.tasks.process_user_[id]'
@@ -126,7 +126,7 @@ class APIClient:
             return "stuck"
         return "online"
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Returns headers for API requests"""
         return {
             "Authorization": f"Bearer {self.api_key}",
@@ -136,8 +136,8 @@ class APIClient:
         }
 
     def _make_request(
-        self, method: str, endpoint: str, payload: Optional[Dict] = None
-    ) -> tuple[bool, Optional[Dict]]:
+        self, method: str, endpoint: str, payload: dict | None = None
+    ) -> tuple[bool, dict | None]:
         """Makes HTTP request to the API"""
         url = f"{self.api_url}{endpoint}"
 
@@ -197,7 +197,7 @@ class APIClient:
 
         return False
 
-    def build_payload(self, metrics: SystemMetrics) -> Dict[str, Any]:
+    def build_payload(self, metrics: SystemMetrics) -> dict[str, Any]:
         """
         Builds privacy-safe payload from metrics.
         Can be used for both API sending and local logging.

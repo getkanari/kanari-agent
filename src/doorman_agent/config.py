@@ -5,11 +5,14 @@ Configuration loading for Doorman Agent
 from __future__ import annotations
 
 import os
-from typing import Optional
+from importlib.metadata import PackageNotFoundError, version
 
 from doorman_agent.models import AlertThresholds, Config, PrivacyConfig
 
-AGENT_VERSION = "0.1.0-alpha.3"
+try:
+    AGENT_VERSION = version("doorman-agent")
+except PackageNotFoundError:
+    AGENT_VERSION = "0.1.0a3"  # fallback for dev installs
 
 # Optional YAML support
 try:
@@ -21,7 +24,7 @@ except ImportError:
     YAML_AVAILABLE = False
 
 
-def load_config(config_path: Optional[str] = None) -> Config:
+def load_config(config_path: str | None = None) -> Config:
     """Loads configuration from YAML file or environment variables"""
     config_data: dict = {}
 

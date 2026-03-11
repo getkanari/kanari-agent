@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from doorman_agent.logger import StructuredLogger
 from doorman_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
@@ -33,11 +33,11 @@ except ImportError:
 class MetricsCollector:
     """Collects metrics from Redis and Celery"""
 
-    def __init__(self, config: Config, logger: Optional[StructuredLogger] = None):
+    def __init__(self, config: Config, logger: StructuredLogger | None = None):
         self.config = config
         self.logger = logger or StructuredLogger("doorman-collector")
-        self.redis_client: Optional[Any] = None
-        self.celery_app: Optional[Any] = None
+        self.redis_client: Any | None = None
+        self.celery_app: Any | None = None
         self._discovered_queues: list[str] = []
 
     def connect(self) -> bool:
@@ -95,7 +95,7 @@ class MetricsCollector:
             inspector = self.celery_app.control.inspect(timeout=5)
             active_queues = inspector.active_queues() or {}
 
-            for worker_name, worker_queues in active_queues.items():
+            for _worker_name, worker_queues in active_queues.items():
                 for queue_info in worker_queues:
                     if isinstance(queue_info, dict):
                         queue_name = queue_info.get("name")
@@ -148,16 +148,16 @@ class MetricsCollector:
             self.logger.error("Failed to get queue depth", queue=queue_name, error=str(e))
             return 0
 
-    def get_oldest_task_age(self, queue_name: str) -> Optional[float]:
+    def get_oldest_task_age(self, queue_name: str) -> float | None:
         """
         Estimates the age of the oldest task in the queue.
-        
+
         Celery messages may or may not have timestamps depending on configuration.
         We try multiple strategies:
         1. Check headers.timestamp (if task_send_sent_event=True)
         2. Check properties.timestamp
         3. Check headers.eta (for scheduled tasks)
-        
+
         Returns None if no timestamp is available.
         """
         if not self.redis_client:
@@ -177,17 +177,17 @@ class MetricsCollector:
 
                 headers = task_data.get("headers", {})
                 properties = task_data.get("properties", {})
-                
+
                 timestamp = None
 
                 # Strategy 1: Check headers.timestamp
                 if "timestamp" in headers:
                     timestamp = headers["timestamp"]
-                
+
                 # Strategy 2: Check properties.timestamp
                 elif "timestamp" in properties:
                     timestamp = properties["timestamp"]
-                
+
                 # Strategy 3: Check if there's a published time in properties
                 elif "published" in properties:
                     timestamp = properties["published"]
@@ -199,7 +199,7 @@ class MetricsCollector:
                     else:
                         # Try parsing ISO format
                         task_time = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
-                    
+
                     age = (datetime.now(timezone.utc) - task_time).total_seconds()
                     return max(0, age)
 
@@ -247,7 +247,7 @@ class MetricsCollector:
         queues_to_monitor = self.get_queues_to_monitor()
 
         # Track max latency across all queues
-        max_latency: Optional[float] = None
+        max_latency: float | None = None
 
         # Collect queue metrics
         for queue_name in queues_to_monitor:

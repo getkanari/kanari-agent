@@ -6,10 +6,9 @@ Uses rich library for beautiful terminal output.
 
 from __future__ import annotations
 
-import sys
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from doorman_agent.models import Config, SystemMetrics
 
@@ -37,7 +36,7 @@ class ConfigCheck:
     name: str
     status: str  # "ok", "warning", "critical"
     message: str
-    recommendation: Optional[str] = None
+    recommendation: str | None = None
 
 
 @dataclass
@@ -71,9 +70,7 @@ def run_audit(
         Exit code (0=healthy, 1=warning, 2=critical)
     """
     from rich.console import Console
-    from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
 
     from doorman_agent.collector import MetricsCollector
     from doorman_agent.logger import StructuredLogger
@@ -274,7 +271,7 @@ def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
         connected = info.get("connected_clients", 0)
         max_clients_raw = redis_client.config_get("maxclients").get("maxclients", "10000")
         max_clients = int(max_clients_raw)
-        
+
         if max_clients > 0:
             client_usage_pct = (connected / max_clients) * 100
             if client_usage_pct > 80:
@@ -458,7 +455,7 @@ def _calculate_trends(samples: list[SystemMetrics]) -> list[QueueTrend]:
 def _is_queue_congested(queue: Any, config: Config, total_concurrency: int = 0) -> bool:
     """
     Determine if a queue is congested.
-    
+
     A queue is congested if:
     - depth > max_queue_size threshold, OR
     - latency > max_wait_time threshold (if latency is known), OR
@@ -467,18 +464,18 @@ def _is_queue_congested(queue: Any, config: Config, total_concurrency: int = 0) 
     # Check depth against absolute threshold
     if queue.depth > config.thresholds.max_queue_size:
         return True
-    
+
     # Check latency threshold (only if latency is available)
     if (
         queue.oldest_task_age_seconds is not None
         and queue.oldest_task_age_seconds > config.thresholds.max_wait_time_seconds
     ):
         return True
-    
+
     # Check depth against capacity - if more pending than total slots, it's backing up
     if total_concurrency > 0 and queue.depth > total_concurrency:
         return True
-    
+
     return False
 
 
@@ -539,7 +536,7 @@ def _analyze_metrics(
     for q in metrics.queues:
         if _is_queue_congested(q, config, metrics.total_concurrency):
             congested_queues.append(q)
-            
+
             # Build recommendation message
             parts = [f"'{q.name}' queue ({q.depth} pending"]
             if q.oldest_task_age_seconds:
@@ -547,7 +544,7 @@ def _analyze_metrics(
             else:
                 parts.append(", latency unknown")
             parts.append(")")
-            
+
             result.recommendations.append(f"Scale workers for {''.join(parts)}")
 
     if congested_queues:
@@ -559,11 +556,11 @@ def _analyze_metrics(
     # If we have more pending tasks than our total capacity and workers are mostly idle,
     # something is wrong (workers not picking up tasks)
     has_significant_backlog = (
-        metrics.total_concurrency > 0 
+        metrics.total_concurrency > 0
         and metrics.total_pending_tasks > metrics.total_concurrency
     )
     low_saturation = metrics.saturation_pct < 50
-    
+
     if has_significant_backlog and low_saturation and metrics.alive_workers > 0:
         # Find which queues have backlog
         backlogged_queues = [q for q in metrics.queues if q.depth > 0]
