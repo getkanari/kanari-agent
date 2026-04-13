@@ -1,8 +1,12 @@
 """
-Tests for doorman_agent.findings module
+Tests for doorman_agent.findings, stamps, and audit JSON output modules
 """
 
 from __future__ import annotations
+
+import json
+import time
+from unittest.mock import MagicMock
 
 from doorman_agent.audit import _status_to_exit_code
 from doorman_agent.collector import _redact_url
@@ -361,3 +365,131 @@ class TestUrlRedaction:
 
     def test_empty_string_unchanged(self):
         assert _redact_url("") == ""
+
+
+# ---------------------------------------------------------------------------
+# DoormanStampPlugin (stamps.py)
+# ---------------------------------------------------------------------------
+
+
+class TestStampHeaders:
+    def test_adds_doorman_ts_header(self):
+        from doorman_agent.stamps import DOORMAN_TS_HEADER, stamp_headers
+
+        headers: dict = {"lang": "py"}
+        result = stamp_headers(headers)
+        assert DOORMAN_TS_HEADER in result
+        assert isinstance(result[DOORMAN_TS_HEADER], float)
+        # Timestamp should be recent (within last 2 seconds)
+        assert abs(result[DOORMAN_TS_HEADER] - time.time()) < 2
+
+    def test_preserves_existing_headers(self):
+        from doorman_agent.stamps import stamp_headers
+
+        headers = {"lang": "py", "task": "my_task"}
+        result = stamp_headers(headers)
+        assert result["lang"] == "py"
+        assert result["task"] == "my_task"
+
+
+class TestDoormanStampPluginInstall:
+    def test_install_connects_before_task_publish(self):
+        from celery.signals import before_task_publish
+
+        from doorman_agent.stamps import DoormanStampPlugin
+
+        app = MagicMock()
+        receivers_before = len(before_task_publish.receivers)
+        DoormanStampPlugin.install(app)
+        assert len(before_task_publish.receivers) > receivers_before
+
+    def test_signal_handler_stamps_headers(self):
+        from celery.signals import before_task_publish
+
+        from doorman_agent.stamps import DOORMAN_TS_HEADER, DoormanStampPlugin
+
+        app = MagicMock()
+        DoormanStampPlugin.install(app)
+
+        # Use send() which dispatches to all connected receivers
+        headers: dict = {"lang": "py"}
+        before_task_publish.send(sender=None, headers=headers)
+
+        assert DOORMAN_TS_HEADER in headers
+        assert isinstance(headers[DOORMAN_TS_HEADER], float)
+        assert headers[DOORMAN_TS_HEADER] > 1_000_000_000  # epoch sanity
+
+    def test_handler_preserved_from_gc(self):
+        from doorman_agent.stamps import DoormanStampPlugin
+
+        app = MagicMock()
+        DoormanStampPlugin.install(app)
+        assert DoormanStampPlugin._handler is not None
+
+
+# ---------------------------------------------------------------------------
+# doorman audit --json output contract
+# ---------------------------------------------------------------------------
+
+
+class TestAuditJsonOutput:
+    def test_json_output_is_parseable_with_required_keys(self, capsys):
+        from doorman_agent.audit import _print_json_output
+        from doorman_agent.findings import Severity, SystemStatus
+
+        metrics = _metrics(
+            total_pending_tasks=10,
+            total_active_tasks=3,
+            saturation_pct=30.0,
+            max_latency_sec=5.2,
+            redis_connected=True,
+            celery_connected=True,
+        )
+        findings = [
+            Finding(
+                id="QUEUE_BACKLOG_CELERY",
+                severity=Severity.MEDIUM,
+                title="Queue backlog",
+                impact="Tasks accumulating",
+                evidence={"queue": "celery", "depth": 500},
+            )
+        ]
+
+        _print_json_output(metrics, findings, SystemStatus.WARNINGS, 1)
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+
+        # Required top-level keys
+        assert "timestamp" in data
+        assert "system_status" in data
+        assert "exit_code" in data
+        assert "top_findings" in data
+        assert "metrics" in data
+
+        # Verify values
+        assert data["system_status"] == "WARNINGS"
+        assert data["exit_code"] == 1
+        assert len(data["top_findings"]) == 1
+        assert data["top_findings"][0]["id"] == "QUEUE_BACKLOG_CELERY"
+
+        # Metrics sub-keys
+        m = data["metrics"]
+        assert m["total_pending"] == 10
+        assert m["total_active"] == 3
+        assert m["redis_connected"] is True
+        assert m["celery_connected"] is True
+
+    def test_json_output_empty_findings(self, capsys):
+        from doorman_agent.audit import _print_json_output
+        from doorman_agent.findings import SystemStatus
+
+        metrics = _metrics()
+        _print_json_output(metrics, [], SystemStatus.OK, 0)
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+
+        assert data["system_status"] == "OK"
+        assert data["exit_code"] == 0
+        assert data["top_findings"] == []

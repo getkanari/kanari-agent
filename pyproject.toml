@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "doorman-agent"
-version = "0.1.0a4.dev1"
+version = "0.1.0b1"
 description = "Privacy-first monitoring agent for Celery + Redis"
 authors = ["Hernán Chilabert <hchilabert@gmail.com>"]
 readme = "README.md"
@@ -91,7 +91,7 @@ severity = "medium"
 confidence = "medium"
 
 [tool.coverage.run]
-omit = ["*/simulator.py"]
+omit = []
 
 [tool.coverage.report]
 exclude_lines = [
