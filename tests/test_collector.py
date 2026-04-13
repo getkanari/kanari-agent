@@ -92,14 +92,17 @@ class TestGetQueueDepth:
 class TestGetOldestTaskAge:
     def test_returns_none_when_no_redis(self, collector):
         collector.redis_client = None
-        assert collector.get_oldest_task_age("celery") is None
+        age, mode = collector.get_oldest_task_age("celery")
+        assert age is None
+        assert mode == "none"
 
     def test_returns_none_for_empty_queue(self, collector):
         mock_redis = MagicMock()
         mock_redis.lindex.return_value = None
         collector.redis_client = mock_redis
 
-        assert collector.get_oldest_task_age("celery") is None
+        age, mode = collector.get_oldest_task_age("celery")
+        assert age is None
 
     def test_returns_age_from_header_timestamp(self, collector):
         # Message sent 100 seconds ago
@@ -108,16 +111,18 @@ class TestGetOldestTaskAge:
         mock_redis.lindex.return_value = _make_celery_message(past_ts)
         collector.redis_client = mock_redis
 
-        age = collector.get_oldest_task_age("celery")
+        age, mode = collector.get_oldest_task_age("celery")
         assert age is not None
         assert 95 < age < 110  # allow some tolerance
+        assert mode == "celery_event"
 
     def test_returns_none_for_invalid_json(self, collector):
         mock_redis = MagicMock()
         mock_redis.lindex.return_value = "not-json"
         collector.redis_client = mock_redis
 
-        assert collector.get_oldest_task_age("celery") is None
+        age, mode = collector.get_oldest_task_age("celery")
+        assert age is None
 
     def test_returns_none_for_message_without_timestamp(self, collector):
         msg = json.dumps({"headers": {}, "properties": {}})
@@ -125,7 +130,8 @@ class TestGetOldestTaskAge:
         mock_redis.lindex.return_value = msg
         collector.redis_client = mock_redis
 
-        assert collector.get_oldest_task_age("celery") is None
+        age, mode = collector.get_oldest_task_age("celery")
+        assert age is None
 
     def test_age_is_non_negative(self, collector):
         # A future timestamp should clamp to 0
@@ -134,7 +140,7 @@ class TestGetOldestTaskAge:
         mock_redis.lindex.return_value = _make_celery_message(future_ts)
         collector.redis_client = mock_redis
 
-        age = collector.get_oldest_task_age("celery")
+        age, mode = collector.get_oldest_task_age("celery")
         assert age is not None
         assert age >= 0
 
@@ -391,7 +397,7 @@ class TestGetOldestTaskAgeExtended:
         mock_redis.lindex.return_value = msg
         collector.redis_client = mock_redis
 
-        age = collector.get_oldest_task_age("celery")
+        age, mode = collector.get_oldest_task_age("celery")
         assert age is not None
         assert age > 25
 
@@ -402,7 +408,7 @@ class TestGetOldestTaskAgeExtended:
         mock_redis.lindex.return_value = msg
         collector.redis_client = mock_redis
 
-        age = collector.get_oldest_task_age("celery")
+        age, mode = collector.get_oldest_task_age("celery")
         assert age is not None
         assert age > 15
 
@@ -413,7 +419,7 @@ class TestGetOldestTaskAgeExtended:
         mock_redis.lindex.return_value = msg
         collector.redis_client = mock_redis
 
-        age = collector.get_oldest_task_age("celery")
+        age, mode = collector.get_oldest_task_age("celery")
         assert age is not None
         assert age >= 0
 

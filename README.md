@@ -194,24 +194,37 @@ saturation_pct = (active_tasks / total_concurrency) × 100
 
 ## CLI Reference
 
+The CLI uses subcommands. Both `doorman` and `doorman-agent` work as the binary name.
+
 ```bash
-# Run continuously (production)
-doorman-agent --config config.yaml
+# One-shot audit report (TUI)
+doorman audit
 
-# Run once (for testing or CI)
-doorman-agent --once --local
-
-# Run continuously in local mode (no API calls)
-doorman-agent --local
-
-# One-time health check with formatted report
-doorman-agent --audit
+# Audit with machine-readable JSON output (for CI/scripts)
+doorman audit --json
 
 # Deep audit: includes Redis/Celery configuration analysis
-doorman-agent --audit --deep
+doorman audit --deep
 
-# Trend detection: collect 3 samples 10 seconds apart
-doorman-agent --audit --samples 3 --interval 10
+# Live dashboard, refreshes every 5s
+doorman watch
+doorman watch --interval 10
+
+# Daemon loop (local mode, no API calls)
+doorman agent --local
+
+# Daemon loop (production, sends to doorman.com)
+doorman agent --token your-api-key
+```
+
+### Using env vars to connect to your infrastructure
+
+`REDIS_URL` and `CELERY_BROKER_URL` override whatever is in `config.yaml`:
+
+```bash
+REDIS_URL=redis://localhost:6379/1 \
+CELERY_BROKER_URL=redis://localhost:6379/1 \
+  doorman audit
 ```
 
 ---
@@ -221,7 +234,7 @@ doorman-agent --audit --samples 3 --interval 10
 One-time health check with a formatted report. Perfect for CI/CD, debugging, or quick status checks.
 
 ```bash
-doorman-agent --audit
+doorman audit
 ```
 
 **Sample output:**
@@ -269,10 +282,10 @@ Metrics
 
 ### Trend Detection
 
-Use multiple samples to detect if queues are growing or shrinking:
+Use `doorman watch` to detect if queues are growing or shrinking over time:
 
 ```bash
-doorman-agent --audit --samples 3 --interval 10
+doorman watch --interval 10
 ```
 
 **Sample output with trends:**
@@ -294,9 +307,7 @@ Trends (over 3 samples)
 ### Deep Configuration Analysis
 
 ```bash
-doorman-agent --audit --deep
-# or alias:
-doorman-agent --audit --config-check
+doorman audit --deep
 ```
 
 **Checks included:**
@@ -371,11 +382,25 @@ Use [doorman-chaosmonkey](https://github.com/herchila/doorman-chaosmonkey) to sp
 # In doorman-chaosmonkey: start Redis + 4 workers
 make up
 
-# In doorman-agent: point to that environment
+# In doorman-agent: point to that environment (chaosmonkey uses DB 1)
 REDIS_URL=redis://localhost:6379/1 \
 CELERY_BROKER_URL=redis://localhost:6379/1 \
-  poetry run doorman-agent --audit
+  make audit
+
+# or with make targets:
+REDIS_URL=redis://localhost:6379/1 CELERY_BROKER_URL=redis://localhost:6379/1 make watch
+REDIS_URL=redis://localhost:6379/1 CELERY_BROKER_URL=redis://localhost:6379/1 make audit-deep
 ```
+
+Available `make` targets for dev:
+
+| Target | Description |
+|--------|-------------|
+| `make audit` | One-shot TUI report |
+| `make audit-json` | JSON output (for CI) |
+| `make audit-deep` | Includes Redis/Celery config analysis |
+| `make watch` | Live dashboard (refreshes every 5s) |
+| `make agent` | Daemon loop in local mode |
 
 ### CI/CD
 

@@ -61,6 +61,7 @@ class QueueMetrics(BaseModel):
     name: str
     depth: int = 0
     oldest_task_age_seconds: float | None = None
+    latency_mode: str = "none"  # "doorman", "celery_event", "none"
 
 
 class WorkerMetrics(BaseModel):
@@ -89,3 +90,4 @@ class SystemMetrics(BaseModel):
     stuck_tasks: list[dict[str, Any]] = Field(default_factory=list)
     redis_connected: bool = False
     celery_connected: bool = False
+    latency_available: bool = False  # True if at least one queue has timestamp data

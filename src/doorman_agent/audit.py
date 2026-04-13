@@ -6,8 +6,10 @@ Uses rich library for beautiful terminal output.
 
 from __future__ import annotations
 
+import json as json_module
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from doorman_agent.models import Config, SystemMetrics
@@ -51,20 +53,42 @@ class AuditResult:
     config_checks: list[ConfigCheck] = field(default_factory=list)
 
 
+def _status_to_exit_code(status: Any) -> int:
+    """Map SystemStatus to exit code."""
+    from doorman_agent.findings import SystemStatus
+
+    mapping = {
+        SystemStatus.OK: EXIT_HEALTHY,
+        SystemStatus.WARNINGS: EXIT_WARNING,
+        SystemStatus.DEGRADED: EXIT_CRITICAL,
+        SystemStatus.CRITICAL: EXIT_CRITICAL,
+    }
+    return mapping.get(status, EXIT_CRITICAL)
+
+
 def run_audit(
     config: Config,
+    json_output: bool = False,
+    md_output: bool = False,
+    no_color: bool = False,
+    deep: bool = False,
+    timeout: float = 3.0,
+    # Legacy positional/keyword args kept for backward compatibility with old tests
     samples: int = 1,
     interval: int = 10,
-    deep: bool = False,
 ) -> int:
     """
     Run an audit check and print a formatted report.
 
     Args:
         config: Doorman configuration
-        samples: Number of samples to collect (for trend detection)
-        interval: Seconds between samples
+        json_output: Print machine-readable JSON to stdout
+        md_output: Print Markdown report
+        no_color: Disable ANSI colors
         deep: Run deep configuration checks
+        timeout: Maximum runtime in seconds
+        samples: (legacy) Number of samples to collect
+        interval: (legacy) Seconds between samples
 
     Returns:
         Exit code (0=healthy, 1=warning, 2=critical)
@@ -73,19 +97,20 @@ def run_audit(
     from rich.progress import Progress, SpinnerColumn, TextColumn
 
     from doorman_agent.collector import MetricsCollector
+    from doorman_agent.findings import FindingsEngine, compute_system_status
     from doorman_agent.logger import StructuredLogger
 
-    console = Console()
+    console = Console(no_color=no_color)
     logger = StructuredLogger("doorman-audit")
     collector = MetricsCollector(config, logger)
 
     start_time = time.time()
 
-    # Header
-    console.print()
-    console.print("[bold cyan]🔍 Doorman Audit[/bold cyan]")
-    console.print("[dim]═" * 60 + "[/dim]")
-    console.print()
+    if not json_output and not md_output:
+        console.print()
+        console.print("[bold cyan]🔍 Doorman Audit[/bold cyan]")
+        console.print("[dim]═" * 60 + "[/dim]")
+        console.print()
 
     # Connect with spinner
     with Progress(
@@ -97,13 +122,25 @@ def run_audit(
         progress.add_task(description="Connecting to infrastructure...", total=None)
 
         if not collector.connect():
-            console.print()
-            console.print("[bold red]❌ Failed to connect to Redis/Celery[/bold red]")
-            console.print("[dim]   Check REDIS_URL and CELERY_BROKER_URL[/dim]")
-            console.print()
+            if json_output:
+                print(
+                    json_module.dumps(
+                        {
+                            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "system_status": "CRITICAL",
+                            "exit_code": EXIT_CRITICAL,
+                            "error": "Failed to connect to Redis/Celery",
+                        }
+                    )
+                )
+            else:
+                console.print()
+                console.print("[bold red]❌ Failed to connect to Redis/Celery[/bold red]")
+                console.print("[dim]   Check REDIS_URL and CELERY_BROKER_URL[/dim]")
+                console.print()
             return EXIT_CRITICAL
 
-    # Collect samples
+    # Collect metrics (respect timeout)
     metrics_samples: list[SystemMetrics] = []
 
     with Progress(
@@ -112,10 +149,11 @@ def run_audit(
         console=console,
         transient=True,
     ) as progress:
-        for i in range(samples):
-            if samples > 1:
+        actual_samples = max(1, samples)
+        for i in range(actual_samples):
+            if actual_samples > 1:
                 task = progress.add_task(
-                    description=f"Collecting sample {i + 1}/{samples}...", total=None
+                    description=f"Collecting sample {i + 1}/{actual_samples}...", total=None
                 )
             else:
                 task = progress.add_task(description="Collecting metrics...", total=None)
@@ -142,16 +180,135 @@ def run_audit(
             progress.add_task(description="Running configuration analysis...", total=None)
             config_checks = _run_config_checks(collector, metrics)
 
-    # Analyze metrics
-    result = _analyze_metrics(metrics, metrics_samples, config, config_checks)
+    # Run findings engine
+    engine = FindingsEngine()
+    findings = engine.analyze(metrics, config, collector.latency_available)
+    system_status = compute_system_status(findings)
+    exit_code = _status_to_exit_code(system_status)
 
-    # Calculate elapsed time
+    # Also run legacy analysis for backward compat (combines config_checks into result)
+    result = _analyze_metrics(metrics, metrics_samples, config, config_checks)
+    # Use the higher exit code between findings-based and legacy analysis
+    final_exit_code = max(exit_code, result.exit_code)
+
     elapsed = time.time() - start_time
 
-    # Print report
-    _print_report(console, metrics, result, config, samples, elapsed, deep)
+    if json_output:
+        _print_json_output(metrics, findings, system_status, final_exit_code)
+    elif md_output:
+        _print_md_report(metrics, findings, system_status, config, elapsed)
+    else:
+        _print_report(console, metrics, result, config, actual_samples, elapsed, deep)
+        _print_findings_section(console, findings, system_status)
 
-    return result.exit_code
+    return final_exit_code
+
+
+def _print_json_output(
+    metrics: SystemMetrics,
+    findings: list[Any],
+    system_status: Any,
+    exit_code: int,
+) -> None:
+    """Print JSON summary to stdout."""
+    from doorman_agent.findings import top_findings
+
+    top = top_findings(findings, 3)
+    top_list = []
+    for f in top:
+        evidence_summary = ", ".join(f"{k}={v}" for k, v in list(f.evidence.items())[:2])
+        top_list.append(
+            {
+                "id": f.id,
+                "severity": f.severity.value,
+                "title": f.title,
+                "evidence_summary": evidence_summary,
+            }
+        )
+
+    output = {
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "system_status": system_status.value,
+        "exit_code": exit_code,
+        "top_findings": top_list,
+        "metrics": {
+            "total_pending": metrics.total_pending_tasks,
+            "total_active": metrics.total_active_tasks,
+            "saturation_pct": round(metrics.saturation_pct, 1),
+            "max_latency_sec": metrics.max_latency_sec,
+            "redis_connected": metrics.redis_connected,
+            "celery_connected": metrics.celery_connected,
+        },
+    }
+    print(json_module.dumps(output))
+
+
+def _print_md_report(
+    metrics: SystemMetrics,
+    findings: list[Any],
+    system_status: Any,
+    config: Config,
+    elapsed: float,
+) -> None:
+    """Print Markdown report to stdout."""
+    lines = [
+        f"# Doorman Audit — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        "",
+        f"**System Status:** {system_status.value}",
+        f"**Duration:** {elapsed:.1f}s",
+        "",
+        "## Infrastructure",
+        f"- Redis: {'connected' if metrics.redis_connected else 'disconnected'}",
+        f"- Celery: {'connected' if metrics.celery_connected else 'disconnected'} ({metrics.total_workers} workers)",
+        "",
+        "## Findings",
+    ]
+    if findings:
+        for f in findings:
+            lines.append(f"- **[{f.severity.value}]** {f.title}")
+    else:
+        lines.append("- No findings — system healthy")
+
+    print("\n".join(lines))
+
+
+def _print_findings_section(console: Any, findings: list[Any], system_status: Any) -> None:
+    """Print findings summary below the main report."""
+    if not findings:
+        return
+
+    console.print()
+    console.print("[bold]Findings[/bold]")
+    for f in findings:
+        sev = f.severity.value
+        if sev == "CRITICAL":
+            color = "red"
+        elif sev == "HIGH":
+            color = "yellow"
+        elif sev == "MEDIUM":
+            color = "blue"
+        else:
+            color = "dim"
+        console.print(f"  [{color}][{sev}][/{color}]   {f.id:<30} {f.title}")
+
+
+def run_watch(
+    config: Config,
+    interval: int = 5,
+    no_color: bool = False,
+    deep: bool = False,
+) -> None:
+    """Run the audit in a loop, refreshing every `interval` seconds."""
+    import os
+
+    while True:
+        try:
+            # Clear terminal
+            os.system("clear" if os.name != "nt" else "cls")
+            run_audit(config, no_color=no_color, deep=deep)
+            time.sleep(interval)
+        except KeyboardInterrupt:
+            break
 
 
 def _run_config_checks(collector: Any, metrics: SystemMetrics) -> list[ConfigCheck]:
@@ -545,8 +702,6 @@ def _analyze_metrics(
             result.exit_code = EXIT_WARNING
 
     # Check for ghost workers (low saturation but significant backlog)
-    # If we have more pending tasks than our total capacity and workers are mostly idle,
-    # something is wrong (workers not picking up tasks)
     has_significant_backlog = (
         metrics.total_concurrency > 0 and metrics.total_pending_tasks > metrics.total_concurrency
     )
@@ -776,8 +931,12 @@ def _print_report(
         else:
             console.print(f"  ⏱️  Max Latency: {metrics.max_latency_sec:.1f}s ({max_latency_queue})")
     elif metrics.total_pending_tasks > 0:
-        # Has pending tasks but can't measure latency
-        console.print("  ⏱️  Max Latency: [yellow]unknown[/yellow] (timestamps not available)")
+        # Has pending tasks but can't measure latency — show the fix inline
+        console.print(
+            "  ⏱️  Max Latency: [yellow]unavailable[/yellow] — "
+            "enable with: [dim]DoormanStampPlugin.install(app)[/dim]  "
+            "[dim](see LATENCY_UNAVAILABLE finding)[/dim]"
+        )
     else:
         console.print("  ⏱️  Max Latency: [green]0s (SLA Safe ✓)[/green]")
 
@@ -844,11 +1003,13 @@ def _print_report(
 
     # Recommendations
     if result.recommendations:
+        from rich.markup import escape
+
         console.print()
         console.print("[dim]═" * 60 + "[/dim]")
         console.print("[bold]💡 Recommendations:[/bold]")
         for rec in result.recommendations:
-            console.print(f"  • {rec}")
+            console.print(f"  • {escape(rec)}")
 
     # Final status footer
     console.print()

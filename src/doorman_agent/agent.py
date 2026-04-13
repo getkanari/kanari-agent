@@ -9,8 +9,9 @@ import sys
 import time
 
 from doorman_agent.api_client import APIClient
-from doorman_agent.collector import MetricsCollector
+from doorman_agent.collector import MetricsCollector, _redact_url
 from doorman_agent.config import AGENT_VERSION
+from doorman_agent.findings import FindingsEngine
 from doorman_agent.logger import StructuredLogger
 from doorman_agent.models import Config, SystemMetrics
 
@@ -96,21 +97,20 @@ class DoormanAgent:
         """Executes one monitoring cycle"""
         metrics = self.collector.collect()
 
-        # Always log basic status
+        # Generate findings
+        engine = FindingsEngine()
+        findings = engine.analyze(metrics, self.config, self.collector.latency_available)
+
+        # Emit one-line health summary
+        lat = f"{metrics.max_latency_sec:.0f}s" if metrics.max_latency_sec is not None else "?"
         self.logger.info(
-            "Health check completed",
-            pending_tasks=metrics.total_pending_tasks,
-            active_tasks=metrics.total_active_tasks,
-            alive_workers=metrics.alive_workers,
-            total_workers=metrics.total_workers,
-            saturation_pct=round(metrics.saturation_pct, 2),
-            max_latency_sec=metrics.max_latency_sec,
-            redis_connected=metrics.redis_connected,
-            celery_connected=metrics.celery_connected,
-            stuck_tasks_count=len(metrics.stuck_tasks),
+            f"Health: {'OK' if not findings else findings[0].severity.value} "
+            f"pending={metrics.total_pending_tasks} active={metrics.total_active_tasks} "
+            f"workers={metrics.alive_workers}/{metrics.total_workers} "
+            f"sat={metrics.saturation_pct:.0f}% max_age={lat} findings={len(findings)}"
         )
 
-        # Local mode: just log metrics
+        # Local mode: just log metrics at DEBUG level
         if self.config.local_mode:
             self._log_metrics_locally(metrics)
             return metrics
@@ -146,7 +146,7 @@ class DoormanAgent:
             version=AGENT_VERSION,
             mode=mode,
             check_interval=self.config.check_interval_seconds,
-            api_url=self.config.api_url if not self.config.local_mode else "disabled",
+            api_url=_redact_url(self.config.api_url) if not self.config.local_mode else "disabled",
         )
 
         # Validate API key if in API mode

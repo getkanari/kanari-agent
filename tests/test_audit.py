@@ -681,12 +681,15 @@ class TestRunAudit:
             alive_workers=2,
             total_workers=2,
         )
+        collector = self._mock_collector(connect_ok=True, metrics=metrics)
+        collector.latency_available = False
+
         with (
             patch("doorman_agent.collector.MetricsCollector") as mock_cls,
             patch("rich.console.Console", return_value=_console()),
         ):
-            mock_cls.return_value = self._mock_collector(connect_ok=True, metrics=metrics)
-            result = run_audit(config, samples=1)
+            mock_cls.return_value = collector
+            result = run_audit(config)
 
         assert result == EXIT_HEALTHY
 
@@ -702,6 +705,7 @@ class TestRunAudit:
         collector = self._mock_collector(connect_ok=True, metrics=metrics)
         collector.redis_client = None
         collector.celery_app = None
+        collector.latency_available = False
 
         with (
             patch("doorman_agent.collector.MetricsCollector") as mock_cls,

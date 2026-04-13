@@ -10,173 +10,135 @@ import sys
 from doorman_agent.config import AGENT_VERSION
 
 
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add args common to multiple subcommands"""
+    parser.add_argument("--config", "-c", help="Path to YAML config file")
+    parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors")
+
+
+def cmd_audit(args: argparse.Namespace) -> None:
+    from doorman_agent.audit import run_audit
+    from doorman_agent.config import load_config
+
+    config = load_config(args.config)
+    exit_code = run_audit(
+        config=config,
+        json_output=getattr(args, "json", False),
+        md_output=getattr(args, "md", False),
+        no_color=getattr(args, "no_color", False),
+        deep=getattr(args, "deep", False),
+        timeout=getattr(args, "timeout", 3),
+    )
+    sys.exit(exit_code)
+
+
+def cmd_watch(args: argparse.Namespace) -> None:
+    from doorman_agent.audit import run_watch
+    from doorman_agent.config import load_config
+
+    config = load_config(args.config)
+    run_watch(
+        config=config,
+        interval=args.interval,
+        no_color=args.no_color,
+        deep=getattr(args, "deep", False),
+    )
+
+
+def cmd_agent(args: argparse.Namespace) -> None:
+    from doorman_agent.agent import DoormanAgent
+    from doorman_agent.config import load_config
+
+    config = load_config(args.config)
+    if args.local:
+        config.local_mode = True
+    if getattr(args, "token", None):
+        config.api_key = args.token
+    if getattr(args, "interval", None):
+        config.check_interval_seconds = args.interval
+
+    agent = DoormanAgent(config)
+    if not agent.collector.connect():
+        print("❌ Could not connect to Redis/Celery")
+        sys.exit(1)
+    agent.run()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Doorman Agent - Celery/Redis Monitoring Agent",
+        prog="doorman",
+        description="Doorman — on-call monitoring for Celery + Redis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
-Version: {AGENT_VERSION}
-
-Examples:
-  # Run agent (sends metrics to doorman.com API)
-  DOORMAN_API_KEY=your-api-key doorman-agent --config config.yaml
-
-  # Run in local mode (only logs, no API calls) - for testing
-  doorman-agent --config config.yaml --local
-
-  # Single check (for testing)
-  doorman-agent --once --local
-
-  # Audit mode - one-time health check with formatted report
-  doorman-agent --audit
-  doorman-agent --audit --samples 3 --interval 10
-
-  # Deep audit - includes Redis/Celery configuration analysis
-  doorman-agent --audit --deep
-  doorman-agent --audit --config-check  # alias for --deep
-
-Simulation Mode (for demos/testing):
-  doorman-agent --simulate --workers 1
-  doorman-agent --simulate --workers 0 --enqueue 5
-
-Environment Variables:
-  DOORMAN_API_KEY      - Your doorman.com API key (required for API mode)
-  DOORMAN_API_URL      - API URL (default: https://api.doorman.com)
-  DOORMAN_LOCAL_MODE   - Set to 'true' for local mode
-  REDIS_URL            - Redis connection URL
-  CELERY_BROKER_URL    - Celery broker URL
-  CHECK_INTERVAL       - Check interval in seconds
-
-Get your API key at: https://doorman.com/dashboard/api-keys
-        """,
     )
-
-    parser.add_argument("--config", "-c", help="Path to YAML configuration file")
-    parser.add_argument("--once", "-1", action="store_true", help="Run only once (for testing)")
-    parser.add_argument(
-        "--local",
-        "-l",
-        action="store_true",
-        help="Local mode: only log metrics, do not send to API",
-    )
-    parser.add_argument(
-        "--api-key", "-k", help="Doorman API key (can also use DOORMAN_API_KEY env var)"
-    )
-    parser.add_argument("--api-url", help="Doorman API URL (default: https://api.doorman.com)")
     parser.add_argument(
         "--version", "-v", action="version", version=f"doorman-agent {AGENT_VERSION}"
     )
 
-    # Audit arguments
-    parser.add_argument(
-        "--audit",
-        "-a",
+    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
+    subparsers.required = False  # allow --version without subcommand
+
+    # ── audit ──────────────────────────────────────────────────────────────────
+    audit_p = subparsers.add_parser("audit", help="One-shot health check with TUI report")
+    _add_common_args(audit_p)
+    audit_p.add_argument(
+        "--json",
         action="store_true",
-        help="Run a one-time audit and print a formatted health report",
+        dest="json",
+        help="Print machine-readable JSON summary",
     )
-    parser.add_argument(
+    audit_p.add_argument("--md", action="store_true", help="Print Markdown report")
+    audit_p.add_argument(
         "--deep",
         "-d",
         action="store_true",
-        help="Run deep configuration analysis (Redis/Celery settings)",
+        help="Deep configuration analysis (Redis/Celery settings)",
     )
-    parser.add_argument(
-        "--config-check",
-        action="store_true",
-        dest="config_check",
-        help="Alias for --deep",
+    audit_p.add_argument(
+        "--timeout",
+        type=float,
+        default=3.0,
+        help="Max runtime in seconds (default 3s)",
     )
-    parser.add_argument(
-        "--samples",
-        type=int,
-        default=1,
-        help="Number of samples for audit (default: 1, use >1 for trend detection)",
-    )
-    parser.add_argument(
+    audit_p.set_defaults(func=cmd_audit)
+
+    # ── watch ──────────────────────────────────────────────────────────────────
+    watch_p = subparsers.add_parser("watch", help="Interactive TUI loop (refreshes periodically)")
+    _add_common_args(watch_p)
+    watch_p.add_argument(
         "--interval",
         type=int,
-        default=10,
-        help="Seconds between audit samples (default: 10)",
+        default=5,
+        help="Refresh interval in seconds (default 5)",
     )
+    watch_p.add_argument("--deep", "-d", action="store_true", help="Include deep config checks")
+    watch_p.set_defaults(func=cmd_watch)
 
-    # Simulation arguments
-    parser.add_argument(
-        "--simulate",
-        "-s",
-        action="store_true",
-        help="Run in simulation mode (starts local Redis + workers)",
-    )
-    parser.add_argument(
-        "--workers",
-        "-w",
+    # ── agent ──────────────────────────────────────────────────────────────────
+    agent_p = subparsers.add_parser("agent", help="Daemon loop: emits periodic heartbeats")
+    _add_common_args(agent_p)
+    agent_p.add_argument(
+        "--interval",
         type=int,
-        default=1,
-        help="Number of workers to simulate (0 = no workers)",
+        default=15,
+        help="Check interval in seconds (default 15)",
     )
-    parser.add_argument(
-        "--enqueue", "-e", type=int, default=0, help="Number of tasks to enqueue in simulation"
+    agent_p.add_argument(
+        "--local",
+        "-l",
+        action="store_true",
+        help="Local mode: only log, no API calls",
     )
+    agent_p.add_argument("--token", help="API token (or set DOORMAN_API_KEY)")
+    agent_p.set_defaults(func=cmd_agent)
 
     args = parser.parse_args()
 
-    # Simulation mode
-    if args.simulate:
-        from doorman_agent.simulator import run_simulation
+    if not hasattr(args, "func"):
+        # No subcommand — print help
+        parser.print_help()
+        sys.exit(0)
 
-        run_simulation(args.workers, args.enqueue)
-        return
-
-    # Import after arg parsing
-    from doorman_agent.config import load_config
-
-    # Load configuration
-    config = load_config(args.config)
-
-    # CLI overrides
-    if args.local:
-        config.local_mode = True
-    if args.api_key:
-        config.api_key = args.api_key
-    if args.api_url:
-        config.api_url = args.api_url
-
-    # Audit mode
-    if args.audit:
-        from doorman_agent.audit import run_audit
-
-        # --deep or --config-check enables deep mode
-        deep_mode = args.deep or args.config_check
-
-        exit_code = run_audit(
-            config=config,
-            samples=args.samples,
-            interval=args.interval,
-            deep=deep_mode,
-        )
-        sys.exit(exit_code)
-
-    # Validate config for daemon/once modes
-    if not config.local_mode and not config.api_key:
-        print("\n⚠️  No API key configured.")
-        print("   Either set DOORMAN_API_KEY or use --local for local mode.")
-        print("   Get your API key at: https://doorman.com/dashboard/api-keys\n")
-        sys.exit(1)
-
-    # Create agent
-    from doorman_agent.agent import DoormanAgent
-
-    agent = DoormanAgent(config)
-
-    # Run (connection happens inside run/check_once)
-    if args.once:
-        # For --once mode, we need to connect first
-        if not agent.collector.connect():
-            print("❌ Could not connect to Redis/Celery")
-            sys.exit(1)
-        agent.check_once()
-    else:
-        # run() handles connection internally
-        agent.run()
+    args.func(args)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 .PHONY: help install test test-path lint format typecheck check build publish clean \
-        run run-once run-local
+        audit watch agent
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 help: ## Show this help message
@@ -15,7 +15,7 @@ install: ## Install all dependencies (including dev)
 test: ## Run tests with coverage (fails below 80%)
 	poetry run pytest --cov=doorman_agent --cov-report=term-missing --cov-fail-under=80
 
-test-path: ## Run tests with path
+test-path: ## Run tests with path (usage: make test-path path=tests/test_findings.py)
 	poetry run pytest $(path) -s
 
 lint: ## Run ruff linter
@@ -46,15 +46,21 @@ publish-test: build ## Publish to TestPyPI
 publish: build ## Publish to PyPI (use CI instead for production releases)
 	poetry publish
 
-# ── Run ──────────────────────────────────────────────────────────────────────
-run: ## Run agent in API mode (requires DOORMAN_API_KEY)
-	poetry run doorman-agent --config config.yaml
+# ── Dev: Run against local Redis (set REDIS_URL and CELERY_BROKER_URL env vars) ──
+audit: ## One-shot audit report  (e.g. make audit)
+	poetry run doorman audit --config config.yaml
 
-run-once: ## Run agent once in local mode
-	poetry run doorman-agent --config config.yaml --local --once
+audit-json: ## Audit with JSON output for CI
+	poetry run doorman audit --config config.yaml --json
 
-run-local: ## Run agent continuously in local mode (no API calls)
-	poetry run doorman-agent --config config.yaml --local
+audit-deep: ## Audit with Redis/Celery config analysis
+	poetry run doorman audit --config config.yaml --deep
+
+watch: ## Live dashboard, refreshes every 5s
+	poetry run doorman watch --config config.yaml
+
+agent: ## Daemon loop (local mode, no API calls)
+	poetry run doorman agent --config config.yaml --local
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts and cache files

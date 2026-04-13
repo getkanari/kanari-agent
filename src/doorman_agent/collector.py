@@ -5,12 +5,14 @@ Metrics collector for Redis and Celery
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
 
 from doorman_agent.logger import StructuredLogger
 from doorman_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
+from doorman_agent.stamps import DOORMAN_TS_HEADER
 
 # Optional dependencies - check at runtime
 try:
@@ -30,6 +32,11 @@ except ImportError:
     CELERY_AVAILABLE = False
 
 
+def _redact_url(url: str) -> str:
+    """Redact password from URL. redis://:password@host -> redis://***@host"""
+    return re.sub(r"(:)[^@/]+(@)", r"\1***\2", url)
+
+
 class MetricsCollector:
     """Collects metrics from Redis and Celery"""
 
@@ -39,6 +46,7 @@ class MetricsCollector:
         self.redis_client: Any | None = None
         self.celery_app: Any | None = None
         self._discovered_queues: list[str] = []
+        self.latency_available: bool = False
 
     def connect(self) -> bool:
         """Establishes connections with Redis and Celery"""
@@ -54,7 +62,9 @@ class MetricsCollector:
                     socket_connect_timeout=30,
                 )
                 self.redis_client.ping()
-                self.logger.info("Redis connection established", url=self.config.redis_url)
+                self.logger.debug(
+                    "Redis connection established", url=_redact_url(self.config.redis_url)
+                )
             except Exception as e:
                 self.logger.error("Redis connection failed", error=str(e))
                 success = False
@@ -71,7 +81,10 @@ class MetricsCollector:
                 self.celery_app.conf.update(
                     broker_connection_timeout=5, broker_connection_retry=False
                 )
-                self.logger.info("Celery app initialized", broker=self.config.celery_broker_url)
+                self.logger.debug(
+                    "Celery app initialized",
+                    broker=_redact_url(self.config.celery_broker_url),
+                )
             except Exception as e:
                 self.logger.error("Celery initialization failed", error=str(e))
                 success = False
@@ -105,7 +118,7 @@ class MetricsCollector:
                         queues.add(queue_info)
 
             if queues:
-                self.logger.info("Discovered queues from workers", queues=list(queues))
+                self.logger.debug("Discovered queues from workers", queues=list(queues))
             else:
                 self.logger.warning("No queues discovered from workers")
 
@@ -129,7 +142,7 @@ class MetricsCollector:
 
         # Fallback to default "celery" queue if nothing discovered
         if not self._discovered_queues:
-            self.logger.warning("No queues configured or discovered, using default 'celery' queue")
+            self.logger.debug("No queues configured or discovered, using default 'celery' queue")
             return ["celery"]
 
         return self._discovered_queues
@@ -146,26 +159,30 @@ class MetricsCollector:
             self.logger.error("Failed to get queue depth", queue=queue_name, error=str(e))
             return 0
 
-    def get_oldest_task_age(self, queue_name: str) -> float | None:
+    def get_oldest_task_age(self, queue_name: str) -> tuple[float | None, str]:
         """
         Estimates the age of the oldest task in the queue.
 
         Celery messages may or may not have timestamps depending on configuration.
         We try multiple strategies:
-        1. Check headers.timestamp (if task_send_sent_event=True)
-        2. Check properties.timestamp
-        3. Check headers.eta (for scheduled tasks)
+        1. Check headers.doorman_sent_ts (Doorman stamp)
+        2. Check headers.timestamp (if task_send_sent_event=True)
+        3. Check properties.timestamp
+        4. Check headers.eta (for scheduled tasks)
 
-        Returns None if no timestamp is available.
+        Returns (age_seconds, latency_mode) where latency_mode is one of:
+          "doorman"       — from doorman_sent_ts header
+          "celery_event"  — from Celery's built-in timestamp header/property
+          "none"          — no timestamp found
         """
         if not self.redis_client:
-            return None
+            return None, "none"
 
         try:
             # Get oldest message (last in list, since LPUSH adds to head)
             oldest_message = self.redis_client.lindex(queue_name, -1)
             if not oldest_message:
-                return None
+                return None, "none"
 
             try:
                 if isinstance(oldest_message, str):
@@ -176,39 +193,45 @@ class MetricsCollector:
                 headers = task_data.get("headers", {})
                 properties = task_data.get("properties", {})
 
-                timestamp = None
+                # Strategy 1: Doorman stamp (highest priority)
+                if DOORMAN_TS_HEADER in headers:
+                    ts = headers[DOORMAN_TS_HEADER]
+                    if isinstance(ts, (int, float)):
+                        age = time.time() - ts
+                        return max(0, age), "doorman"
 
-                # Strategy 1: Check headers.timestamp
+                # Strategy 2: Celery event timestamp in headers
+                timestamp = None
+                latency_mode = "none"
+
                 if "timestamp" in headers:
                     timestamp = headers["timestamp"]
-
-                # Strategy 2: Check properties.timestamp
+                    latency_mode = "celery_event"
                 elif "timestamp" in properties:
                     timestamp = properties["timestamp"]
-
-                # Strategy 3: Check if there's a published time in properties
+                    latency_mode = "celery_event"
                 elif "published" in properties:
                     timestamp = properties["published"]
+                    latency_mode = "celery_event"
 
-                if timestamp:
+                if timestamp is not None:
                     # Handle both float timestamps and ISO strings
                     if isinstance(timestamp, (int, float)):
                         task_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
                     else:
-                        # Try parsing ISO format
                         task_time = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
 
                     age = (datetime.now(timezone.utc) - task_time).total_seconds()
-                    return max(0, age)
+                    return max(0, age), latency_mode
 
             except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                 pass
 
-            return None
+            return None, "none"
 
         except Exception as e:
             self.logger.error("Failed to get oldest task age", queue=queue_name, error=str(e))
-            return None
+            return None, "none"
 
     def get_worker_stats(self) -> tuple[dict, dict, dict]:
         """Gets worker statistics via Celery inspect"""
@@ -233,6 +256,9 @@ class MetricsCollector:
         """Collects all system metrics"""
         metrics = SystemMetrics(timestamp=datetime.now(timezone.utc).isoformat())
 
+        # Reset latency tracking
+        self.latency_available = False
+
         # Verify Redis connection
         if self.redis_client:
             try:
@@ -250,20 +276,25 @@ class MetricsCollector:
         # Collect queue metrics
         for queue_name in queues_to_monitor:
             depth = self.get_queue_depth(queue_name)
-            oldest_age = self.get_oldest_task_age(queue_name)
+            oldest_age, latency_mode = self.get_oldest_task_age(queue_name)
 
             queue_metrics = QueueMetrics(
-                name=queue_name, depth=depth, oldest_task_age_seconds=oldest_age
+                name=queue_name,
+                depth=depth,
+                oldest_task_age_seconds=oldest_age,
+                latency_mode=latency_mode,
             )
             metrics.queues.append(queue_metrics)
             metrics.total_pending_tasks += depth
 
             # Track max latency
             if oldest_age is not None:
+                self.latency_available = True
                 if max_latency is None or oldest_age > max_latency:
                     max_latency = oldest_age
 
         metrics.max_latency_sec = max_latency
+        metrics.latency_available = self.latency_available
 
         # Collect worker metrics
         active, reserved, stats = self.get_worker_stats()
