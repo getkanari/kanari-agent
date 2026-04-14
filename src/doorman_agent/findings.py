@@ -259,7 +259,7 @@ class FindingsEngine:
                 Finding(
                     id="LATENCY_UNAVAILABLE",
                     severity=Severity.MEDIUM,
-                    title="Latency unavailable — add task_send_sent_event = True to enable",
+                    title="Latency unavailable — install DoormanStampPlugin to enable",
                     impact="SLA breach detection is blind; tasks may wait for minutes without alerting.",
                     evidence={
                         "latency_available": False,
@@ -267,17 +267,18 @@ class FindingsEngine:
                     },
                     probable_cause=[
                         "Celery + Redis does not add timestamps to queue messages by default",
-                        "Note: task_send_sent_event=True only emits events to the Celery event stream — it does NOT stamp queue messages",
+                        "task_send_sent_event=True does NOT help — it only emits events to the Celery event stream, not to queue messages",
                     ],
                     confirm_steps=[
-                        "Inspect a raw message — look for 'doorman_sent_ts' or 'timestamp' in headers:",
-                        "redis-cli -n 1 LINDEX <queue_name> -1 | python3 -m json.tool | grep -E 'timestamp|doorman'",
+                        "Inspect a raw message — look for 'doorman_sent_ts' in headers:",
+                        "redis-cli -n 1 LINDEX <queue_name> -1 | python3 -m json.tool | grep doorman_sent_ts",
                     ],
                     safe_fix=[
                         "Add DoormanStampPlugin to your Celery app (one line):\n"
                         "  from doorman_agent.stamps import DoormanStampPlugin\n"
                         "  DoormanStampPlugin.install(app)  # before any task is published",
                         "This uses the before_task_publish signal and adds 'doorman_sent_ts' to every message header.",
+                        "Note: only NEW tasks published after install will have timestamps.",
                     ],
                 )
             )
