@@ -51,6 +51,10 @@ thresholds:
   max_queue_size: 1000
   max_wait_time_seconds: 60
   max_task_runtime_seconds: 1800  # 30 minutes
+
+  # Enable task latency tracking
+  task_send_sent_event: False
+
   critical_queues:
     - emails
     - notifications

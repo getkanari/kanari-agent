@@ -37,6 +37,9 @@ def _redact_url(url: str) -> str:
     return re.sub(r"(:)[^@/]+(@)", r"\1***\2", url)
 
 
+INSPECT_TIMEOUT = 1.0
+
+
 class MetricsCollector:
     """Collects metrics from Redis and Celery"""
 
@@ -58,8 +61,8 @@ class MetricsCollector:
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
                     decode_responses=True,
-                    socket_timeout=30,
-                    socket_connect_timeout=30,
+                    socket_timeout=5,
+                    socket_connect_timeout=5,
                 )
                 self.redis_client.ping()
                 self.logger.debug(
@@ -94,38 +97,54 @@ class MetricsCollector:
 
         return success
 
-    def discover_queues(self) -> list[str]:
+    def _inspect_all(self) -> tuple[dict, dict, dict, dict]:
+        """Single inspector call that fetches all Celery data at once.
+
+        Returns (active_queues, active, reserved, stats) dicts.
         """
-        Auto-discover queues from Celery workers.
-        Returns list of queue names that workers are listening to.
-        """
-        queues: set[str] = set()
+        active_queues: dict = {}
+        active: dict = {}
+        reserved: dict = {}
+        stats: dict = {}
 
         if not self.celery_app:
-            return list(queues)
+            return active_queues, active, reserved, stats
 
         try:
-            inspector = self.celery_app.control.inspect(timeout=5)
+            inspector = self.celery_app.control.inspect(timeout=INSPECT_TIMEOUT)
             active_queues = inspector.active_queues() or {}
-
-            for _worker_name, worker_queues in active_queues.items():
-                for queue_info in worker_queues:
-                    if isinstance(queue_info, dict):
-                        queue_name = queue_info.get("name")
-                        if queue_name:
-                            queues.add(queue_name)
-                    elif isinstance(queue_info, str):
-                        queues.add(queue_info)
-
-            if queues:
-                self.logger.debug("Discovered queues from workers", queues=list(queues))
-            else:
-                self.logger.warning("No queues discovered from workers")
-
+            active = inspector.active() or {}
+            reserved = inspector.reserved() or {}
+            stats = inspector.stats() or {}
         except Exception as e:
-            self.logger.error("Failed to discover queues", error=str(e))
+            self.logger.error("Failed to inspect Celery workers", error=str(e))
+
+        return active_queues, active, reserved, stats
+
+    def _extract_queue_names(self, active_queues: dict) -> list[str]:
+        """Extract queue names from active_queues inspector response."""
+        queues: set[str] = set()
+
+        for _worker_name, worker_queues in active_queues.items():
+            for queue_info in worker_queues:
+                if isinstance(queue_info, dict):
+                    queue_name = queue_info.get("name")
+                    if queue_name:
+                        queues.add(queue_name)
+                elif isinstance(queue_info, str):
+                    queues.add(queue_info)
+
+        if queues:
+            self.logger.debug("Discovered queues from workers", queues=list(queues))
+        elif active_queues:
+            self.logger.warning("No queues discovered from workers")
 
         return list(queues)
+
+    def discover_queues(self) -> list[str]:
+        """Auto-discover queues from Celery workers."""
+        active_queues, _, _, _ = self._inspect_all()
+        return self._extract_queue_names(active_queues)
 
     def get_queues_to_monitor(self) -> list[str]:
         """
@@ -234,22 +253,12 @@ class MetricsCollector:
             return None, "none"
 
     def get_worker_stats(self) -> tuple[dict, dict, dict]:
-        """Gets worker statistics via Celery inspect"""
-        active: dict = {}
-        reserved: dict = {}
-        stats: dict = {}
+        """Gets worker statistics via Celery inspect.
 
-        if not self.celery_app:
-            return active, reserved, stats
-
-        try:
-            inspector = self.celery_app.control.inspect(timeout=5)
-            active = inspector.active() or {}
-            reserved = inspector.reserved() or {}
-            stats = inspector.stats() or {}
-        except Exception as e:
-            self.logger.error("Failed to inspect Celery workers", error=str(e))
-
+        Prefer calling _inspect_all() directly in collect() to avoid
+        duplicate broadcasts. This method is kept for backward compatibility.
+        """
+        _, active, reserved, stats = self._inspect_all()
         return active, reserved, stats
 
     def collect(self) -> SystemMetrics:
@@ -267,8 +276,22 @@ class MetricsCollector:
             except Exception:
                 metrics.redis_connected = False
 
-        # Get queues to monitor (configured or auto-discovered)
-        queues_to_monitor = self.get_queues_to_monitor()
+        # Single Celery inspect call for all data
+        celery_queues, active, reserved, stats = self._inspect_all()
+
+        # Determine queues to monitor
+        if self.config.monitored_queues:
+            queues_to_monitor = self.config.monitored_queues
+        else:
+            discovered = self._extract_queue_names(celery_queues)
+            if discovered:
+                self._discovered_queues = discovered
+            if not self._discovered_queues:
+                self.logger.debug(
+                    "No queues configured or discovered, using default 'celery' queue"
+                )
+                self._discovered_queues = ["celery"]
+            queues_to_monitor = self._discovered_queues
 
         # Track max latency across all queues
         max_latency: float | None = None
@@ -296,9 +319,7 @@ class MetricsCollector:
         metrics.max_latency_sec = max_latency
         metrics.latency_available = self.latency_available
 
-        # Collect worker metrics
-        active, reserved, stats = self.get_worker_stats()
-
+        # Process worker metrics (already fetched via _inspect_all above)
         if active or reserved or stats:
             metrics.celery_connected = True
 
