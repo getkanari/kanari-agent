@@ -40,6 +40,8 @@ mypy = ">=1.0"
 types-pyyaml = ">=6.0"
 types-redis = ">=4.0"
 pre-commit = ">=3.0"
+bandit = ">=1.7"
+detect-secrets = ">=1.4"
 
 [tool.poetry.scripts]
 doorman-agent = "doorman_agent.cli:main"

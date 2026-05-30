@@ -299,12 +299,13 @@ def run_watch(
     deep: bool = False,
 ) -> None:
     """Run the audit in a loop, refreshing every `interval` seconds."""
-    import os
+    from rich.console import Console
+
+    console = Console(no_color=no_color)
 
     while True:
         try:
-            # Clear terminal
-            os.system("clear" if os.name != "nt" else "cls")
+            console.clear()
             run_audit(config, no_color=no_color, deep=deep)
             time.sleep(interval)
         except KeyboardInterrupt:
