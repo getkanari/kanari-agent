@@ -22,8 +22,6 @@ class AlertThresholds(BaseModel):
 class PrivacyConfig(BaseModel):
     """Privacy-related configuration"""
 
-    # If True, task signatures are sanitized (e.g., "app.tasks.process_user_123" -> "app.tasks.process_user_[id]")
-    # If False, task signatures are sent as-is (use only if you're sure they don't contain PII)
     sanitize_task_signatures: bool = True
 
 

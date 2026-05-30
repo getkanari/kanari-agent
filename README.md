@@ -111,6 +111,30 @@ doorman agent --token your-api-key   # sends metrics to doorman.com
 
 ## Configuration
 
+Create a `config.yaml` file:
+
+```yaml
+# API Connection
+api_key: null  # Use DOORMAN_API_KEY env var instead
+api_url: "https://api.doorman.com"
+
+# Local mode (no API calls, just logging)
+local_mode: false
+
+# Redis/Celery
+redis_url: "redis://localhost:6379/0"
+celery_broker_url: "redis://localhost:6379/0"
+
+# Behavior
+check_interval_seconds: 30
+
+# Queues to monitor
+monitored_queues:
+  - celery
+  - default
+  - emails
+```
+
 ### Environment variables
 
 | Variable | Description | Default |
