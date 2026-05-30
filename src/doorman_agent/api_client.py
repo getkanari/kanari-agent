@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from doorman_agent.config import AGENT_VERSION
 from doorman_agent.logger import StructuredLogger
@@ -136,8 +136,8 @@ class APIClient:
         }
 
     def _make_request(
-        self, method: str, endpoint: str, payload: Optional[dict] = None
-    ) -> tuple[bool, Optional[dict]]:
+        self, method: str, endpoint: str, payload: dict | None = None
+    ) -> tuple[bool, dict | None]:
         """Makes HTTP request to the API"""
         url = f"{self.api_url}{endpoint}"
 

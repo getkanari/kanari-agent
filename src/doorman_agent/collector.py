@@ -8,7 +8,7 @@ import json
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from doorman_agent.logger import StructuredLogger
 from doorman_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
@@ -40,7 +40,7 @@ def _redact_url(url: str) -> str:
 class MetricsCollector:
     """Collects metrics from Redis and Celery"""
 
-    def __init__(self, config: Config, logger: Optional[StructuredLogger] = None):
+    def __init__(self, config: Config, logger: StructuredLogger | None = None):
         self.config = config
         self.logger = logger or StructuredLogger("doorman-collector")
         self.redis_client: Any | None = None
