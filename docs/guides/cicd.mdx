@@ -1,0 +1,187 @@
+---
+title: CI/CD Integration
+description: Use Doorman as a quality gate in your deployment pipeline
+---
+
+## Overview
+
+`doorman audit` exits with a meaningful status code:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Healthy |
+| `1` | Warnings |
+| `2` | Critical |
+
+This makes it a natural fit for CI/CD pipelines: run an audit before or after a deploy, and fail the pipeline if critical issues are found.
+
+---
+
+## GitHub Actions
+
+### Basic health check
+
+```yaml
+# .github/workflows/celery-health.yml
+name: Celery Health Check
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"  # every 15 minutes
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Doorman audit
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+        run: |
+          pip install doorman-agent
+          doorman audit --json
+```
+
+### Pre-deploy gate
+
+Run an audit before deploying. If Celery is already unhealthy, don't make it worse.
+
+```yaml
+jobs:
+  pre-deploy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Celery pre-deploy health check
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+        run: |
+          pip install doorman-agent
+          doorman audit --json
+          if [ $? -eq 2 ]; then
+            echo "❌ Celery is in CRITICAL state. Aborting deploy."
+            exit 1
+          fi
+
+  deploy:
+    needs: pre-deploy-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy application
+        run: echo "Deploying..."
+```
+
+### Post-deploy verification
+
+Check that Celery is still healthy after deploying.
+
+```yaml
+  post-deploy-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for workers to stabilize
+        run: sleep 30
+
+      - name: Post-deploy Celery audit
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+        run: |
+          pip install doorman-agent
+          doorman audit --json
+```
+
+---
+
+## Shell scripts
+
+```bash
+#!/bin/bash
+# deploy.sh
+
+echo "Running Celery health check..."
+doorman audit --json
+STATUS=$?
+
+if [ $STATUS -eq 2 ]; then
+  echo "CRITICAL: Celery issues detected. Deploy aborted."
+  exit 1
+elif [ $STATUS -eq 1 ]; then
+  echo "WARNING: Celery warnings detected. Proceeding with caution."
+fi
+
+echo "Deploying..."
+# your deploy commands here
+```
+
+---
+
+## Capturing JSON output
+
+Use `--json` to capture structured output for logging or alerting:
+
+```bash
+AUDIT=$(doorman audit --json)
+STATUS=$(echo $AUDIT | jq -r '.system_status')
+PENDING=$(echo $AUDIT | jq -r '.metrics.total_pending')
+
+echo "Status: $STATUS, Pending tasks: $PENDING"
+
+if [ "$STATUS" = "CRITICAL" ]; then
+  # Send to Slack, PagerDuty, etc.
+  curl -X POST $SLACK_WEBHOOK \
+    -H 'Content-type: application/json' \
+    -d "{\"text\": \"🚨 Celery CRITICAL: $PENDING tasks pending\"}"
+fi
+```
+
+---
+
+## Docker
+
+```bash
+docker run --rm \
+  -e REDIS_URL=redis://your-redis:6379/0 \
+  -e CELERY_BROKER_URL=redis://your-redis:6379/0 \
+  python:3.12-slim \
+  sh -c "pip install -q doorman-agent && doorman audit --json"
+```
+
+---
+
+## Kubernetes CronJob
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: doorman-health-check
+spec:
+  schedule: "*/10 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: doorman
+              image: python:3.12-slim
+              command:
+                - sh
+                - -c
+                - pip install -q doorman-agent && doorman audit --json
+              env:
+                - name: REDIS_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: celery-secrets
+                      key: redis-url
+                - name: CELERY_BROKER_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: celery-secrets
+                      key: broker-url
+          restartPolicy: Never
+```

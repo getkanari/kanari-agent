@@ -1,0 +1,131 @@
+---
+title: doorman audit
+description: One-shot health check with exit codes for CI/CD integration
+---
+
+## Overview
+
+`doorman audit` connects to your Redis and Celery instances, collects metrics, runs the findings engine, and prints a formatted report. It then exits with a status code that reflects the severity of what it found.
+
+```bash
+doorman audit
+```
+
+---
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--config`, `-c` | — | Path to a YAML config file |
+| `--json` | off | Output machine-readable JSON instead of TUI |
+| `--md` | off | Output a Markdown report |
+| `--deep`, `-d` | off | Include Redis and Celery configuration analysis |
+| `--timeout` | `3.0` | Max seconds to wait for connections and metrics |
+| `--no-color` | off | Disable ANSI colors (useful in CI logs) |
+
+---
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Healthy — no findings |
+| `1` | Warnings — at least one MEDIUM or LOW finding |
+| `2` | Critical — at least one HIGH or CRITICAL finding |
+
+---
+
+## Output modes
+
+### TUI (default)
+
+Rich-formatted report with color-coded status indicators. Best for humans running audits interactively.
+
+```bash
+doorman audit
+```
+
+### JSON
+
+Machine-readable output. Use this in CI scripts, log aggregation, or when piping to other tools.
+
+```bash
+doorman audit --json
+```
+
+```json
+{
+  "timestamp": "2026-05-31T14:22:01Z",
+  "system_status": "DEGRADED",
+  "exit_code": 2,
+  "top_findings": [
+    {
+      "id": "WORKER_OFFLINE",
+      "severity": "CRITICAL",
+      "title": "Worker offline: beat-wrk",
+      "evidence_summary": "worker=beat-wrk, is_alive=False"
+    },
+    {
+      "id": "QUEUE_SLA_BREACH_EMAILS",
+      "severity": "HIGH",
+      "title": "SLA breach on queue 'emails'",
+      "evidence_summary": "queue=emails, latency_sec=125.4"
+    }
+  ],
+  "metrics": {
+    "total_pending": 862,
+    "total_active": 7,
+    "saturation_pct": 43.8,
+    "max_latency_sec": 125.4,
+    "redis_connected": true,
+    "celery_connected": true
+  }
+}
+```
+
+### Markdown
+
+Structured Markdown output. Useful for posting to Slack, GitHub issues, or incident reports.
+
+```bash
+doorman audit --md
+```
+
+---
+
+## With a config file
+
+```bash
+doorman audit --config config.yaml
+```
+
+The config file lets you set custom thresholds, specify which queues to monitor, and configure privacy settings. See [Configuration](/reference/configuration) for the full reference.
+
+---
+
+## Deep mode
+
+```bash
+doorman audit --deep
+```
+
+Adds a **Configuration Analysis** section to the report that checks your Redis and Celery settings for common production risks. See [Deep Audit](/guides/deep-audit) for details.
+
+---
+
+## Examples
+
+```bash
+# Quick check — is anything broken right now?
+doorman audit
+
+# CI gate — fail pipeline if critical issues found
+doorman audit --json && echo "Celery healthy"
+
+# Debug an incident with full config analysis
+doorman audit --deep --no-color 2>&1 | tee incident-$(date +%Y%m%d).log
+
+# Check a specific environment
+REDIS_URL=redis://staging-redis:6379/0 doorman audit
+```

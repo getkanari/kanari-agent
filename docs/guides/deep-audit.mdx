@@ -1,0 +1,148 @@
+---
+title: Deep Audit
+description: Detect Redis and Celery misconfigurations before they cause incidents
+---
+
+## Overview
+
+```bash
+doorman audit --deep
+```
+
+The `--deep` flag adds a **Configuration Analysis** section to the audit report. It inspects your Redis and Celery runtime configuration for settings that are technically valid but will cause problems in production.
+
+These are the misconfigurations that cause silent task loss, cascading failures, and incidents that are very hard to debug.
+
+---
+
+## Redis checks
+
+### `maxmemory` not set
+
+**Risk:** Redis has no memory limit. Under high load, Redis can exhaust system memory, trigger the OOM killer, and lose all queued tasks.
+
+**Fix:**
+```bash
+redis-cli CONFIG SET maxmemory 2gb
+```
+
+Or in `redis.conf`:
+```
+maxmemory 2gb
+```
+
+---
+
+### Eviction policy `noeviction`
+
+**Risk:** When Redis hits its memory limit with `noeviction`, write commands fail with an error. New tasks can't be enqueued. Your application raises exceptions. Workers run out of work. Users notice.
+
+**Recommended policy for Celery brokers:**
+```bash
+redis-cli CONFIG SET maxmemory-policy volatile-lru
+```
+
+`volatile-lru` evicts the least recently used keys that have an expiry set, leaving your task queues (which have no expiry) untouched.
+
+---
+
+### Persistence disabled
+
+**Risk:** If Redis restarts without RDB or AOF persistence enabled, all queued tasks are lost permanently. No error is raised — they simply disappear.
+
+**Fix:** Enable at minimum RDB snapshots:
+```bash
+redis-cli CONFIG SET save "900 1 300 10 60 10000"
+```
+
+---
+
+### Connection pool saturation
+
+**Risk:** When `connected_clients` approaches `maxclients`, new connections are refused. Workers can't connect, publishers can't enqueue tasks. The system grinds to a halt.
+
+**Fix:** Increase `maxclients` or reduce connection pool sizes in your application:
+```bash
+redis-cli CONFIG SET maxclients 10000
+```
+
+---
+
+## Celery checks
+
+### `task_acks_late = False` (default)
+
+**Risk:** This is the default and the most common source of silent task loss. With `task_acks_late=False`, Celery acknowledges (removes from the queue) a task the moment a worker receives it — before execution begins. If the worker crashes, is OOM-killed, or receives SIGKILL, the task is gone permanently.
+
+**Fix:**
+```python
+# celery config
+task_acks_late = True
+```
+
+<Warning>
+With `task_acks_late=True`, tasks may execute more than once if a worker crashes mid-execution. Make your tasks idempotent before enabling this setting.
+</Warning>
+
+---
+
+### `task_reject_on_worker_lost = False` (default)
+
+**Risk:** Even with `task_acks_late=True`, if a worker is killed with SIGKILL (e.g., by the OOM killer), the task may still be lost depending on broker behavior. `task_reject_on_worker_lost=True` tells the broker to requeue the task when the worker connection is lost unexpectedly.
+
+**Fix:**
+```python
+task_acks_late = True
+task_reject_on_worker_lost = True
+```
+
+Note: This setting is more reliable with RabbitMQ than Redis.
+
+---
+
+### `worker_prefetch_multiplier > 1` (default is 4)
+
+**Risk:** With the default prefetch multiplier, each worker reserves `concurrency × 4` tasks in advance. This means:
+- A worker with 4 processes prefetches 16 tasks
+- If 15 of those are slow tasks, 15 tasks sit reserved and unprocessed while other workers are idle
+- Queue depth looks manageable while actual throughput is terrible
+
+**Fix:**
+```python
+worker_prefetch_multiplier = 1
+```
+
+With `multiplier=1`, each process only holds one task at a time, enabling fair distribution.
+
+---
+
+### Single worker
+
+**Risk:** One worker is a single point of failure. One crash = zero processing capacity. One deploy = full downtime.
+
+**Recommendation:** Run at least 2 workers in production. In Kubernetes, set `replicas: 2` minimum with a `PodDisruptionBudget`.
+
+---
+
+## Interpreting the report
+
+```
+Configuration Analysis
+  Status   Check                           Result
+  ✅       Redis maxmemory                 42.3% used
+  ⚠️       Redis eviction policy           noeviction (writes fail when full)
+  ✅       Redis persistence               Enabled
+  ✅       Redis connection pool           87/10000 connections
+  ❌       Celery task_acks_late           False (task loss if worker dies)
+  ❌       Celery task_reject_on_worker    False (silent task loss possible)
+  ⚠️       Celery prefetch_multiplier      4 (may cause uneven distribution)
+  ⚠️       Worker redundancy              Only 1 worker (single point of failure)
+
+💡 Recommendations:
+  • Redis eviction policy: CONFIG SET maxmemory-policy volatile-lru
+  • Celery task_acks_late: Set task_acks_late=True in Celery config
+  • Celery task_reject_on_worker_lost: Set task_reject_on_worker_lost=True
+  • Celery prefetch_multiplier: Set worker_prefetch_multiplier=1 for long tasks
+```
+
+Green (✅) is good. Yellow (⚠️) is a warning that may or may not apply to your workload. Red (❌) is a configuration that is known to cause data loss or instability and should be fixed.

@@ -1,0 +1,123 @@
+---
+title: Privacy & Data
+description: What Doorman collects, what it redacts, and how to verify
+---
+
+## Design principle
+
+Doorman is built for production environments where task arguments, queue payloads, and worker names can contain sensitive data. The agent applies privacy transformations before any data leaves your infrastructure.
+
+**Task arguments are never accessed.** The agent reads queue messages only to extract metadata (timestamps, task name, task ID). Payload content is never parsed, stored, or transmitted.
+
+---
+
+## What gets collected
+
+### Queue metrics
+
+| Field | Example value | Privacy treatment |
+|-------|--------------|-------------------|
+| Queue name | `emails` | Sanitized (emails/UUIDs removed) |
+| Queue depth | `847` | Collected as-is |
+| Oldest task age | `125.4s` | Collected as-is |
+
+### Worker metrics
+
+| Field | Example value | Privacy treatment |
+|-------|--------------|-------------------|
+| Worker hostname | `celery@prod-worker-1.internal` | Hashed to `w-a1b2c3d4` |
+| Active task count | `3` | Collected as-is |
+| Concurrency | `8` | Collected as-is |
+| Alive/offline status | `true` | Collected as-is |
+
+### Task metadata
+
+| Field | Example value | Privacy treatment |
+|-------|--------------|-------------------|
+| Task ID | `550e8400-e29b-41d4-a716-446655440000` | Hashed to `t-8f3a2b1c4d5e` |
+| Task name | `myapp.tasks.process_user_12345` | Sanitized |
+| Task arguments | `{"user_id": 123, "email": "..."}` | **Never accessed** |
+| Task result | `{"status": "ok", ...}` | **Never accessed** |
+
+---
+
+## Sanitization rules
+
+### Worker names
+
+Worker hostnames are hashed with SHA-256 (first 8 hex chars) and prefixed with `w-`:
+
+```
+celery@prod-worker-1.internal  →  w-a1b2c3d4
+celery@ip-10-0-1-234           →  w-7f2e9b1c
+```
+
+A display name is also extracted for readability (domain stripped):
+
+```
+celery@prod-worker-1.internal  →  display: "prod-worker-1"
+celery@ip-10-0-1-234           →  display: "ip-10-0-1-234"
+```
+
+### Task IDs
+
+Task IDs (UUIDs) are hashed with SHA-256 (first 12 hex chars) and prefixed with `t-`:
+
+```
+550e8400-e29b-41d4-a716-446655440000  →  t-8f3a2b1c4d5e
+```
+
+### Task signatures
+
+Task names are sanitized to remove patterns that commonly contain PII:
+
+| Pattern | Example | Result |
+|---------|---------|--------|
+| Email addresses | `send_email_john@acme.com` | `send_email_[email]` |
+| UUIDs | `process_order_550e8400-e29b...` | `process_order_[uuid]` |
+| Numeric IDs (4+ digits) | `notify_user_98765` | `notify_user_[id]` |
+
+### Queue names
+
+Queue names are also sanitized for emails and UUIDs:
+
+```
+emails-john@acme.com                          →  emails-[email]
+tenant-550e8400-e29b-41d4-a716-446655440000   →  tenant-[uuid]
+```
+
+---
+
+## Disabling sanitization
+
+If your task names contain no PII (e.g., all names are static identifiers like `myapp.tasks.send_invoice`), you can disable sanitization:
+
+```yaml
+# config.yaml
+privacy:
+  sanitize_task_signatures: false
+```
+
+This sends task names as-is, which makes findings easier to read.
+
+---
+
+## Verifying what gets sent
+
+Run in local mode with JSON output to inspect exactly what the agent collects in your environment before connecting to any external service:
+
+```bash
+doorman audit --json | python3 -m json.tool
+```
+
+In agent local mode, every cycle's payload is logged to stdout:
+
+```bash
+doorman agent --local
+```
+
+---
+
+## Data in transit
+
+When using `doorman agent` in API mode, data is sent over HTTPS to `api.doorman.com`. The agent uses Python's stdlib `urllib` (no third-party HTTP library). No data is stored locally between cycles.
