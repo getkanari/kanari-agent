@@ -1,0 +1,68 @@
+---
+title: Introduction
+description: Privacy-first monitoring agent for Celery + Redis queues
+---
+
+## What is Doorman?
+
+Doorman is a monitoring agent built specifically for Celery + Redis. It detects the problems that generic monitoring tools miss — ghost workers, queue latency, stuck tasks, and silent task loss — and tells you exactly what's wrong and how to fix it.
+
+```bash
+pip install doorman-agent
+doorman audit
+```
+
+No config file. No API key. No external service. Works against any Celery + Redis setup in under a minute.
+
+---
+
+## The problem with generic monitoring
+
+Tools like Datadog and Grafana can tell you CPU and memory. They don't understand Celery's queue model, worker pool semantics, or task acknowledgment lifecycle.
+
+The most common Celery production failure looks like this: **workers show as running, the queue keeps growing, nobody knows why.** This happens because:
+
+- Workers reconnected to Redis after a blip but stopped consuming
+- All worker slots are full with one slow task type
+- `task_acks_late=False` means tasks silently vanished on the last deploy
+- Queue latency is spiking but there's no timestamp in the messages to measure it
+
+Datadog sees healthy CPU. Doorman sees the actual problem.
+
+---
+
+## How it works
+
+Doorman connects directly to your Redis and Celery instances — the same way your workers do — and collects:
+
+- **Queue depth** per queue (via Redis `LLEN`)
+- **Queue latency** — age of the oldest waiting task (requires [DoormanStampPlugin](/guides/latency-tracking))
+- **Worker health** — active tasks, concurrency slots, alive/offline status
+- **Stuck tasks** — tasks running beyond your configured threshold
+- **Configuration risks** — `task_acks_late`, prefetch settings, Redis eviction policy
+
+It then runs a [findings engine](/reference/findings) that produces structured observations: what's wrong, why it's probably happening, how to confirm it, and what to do about it.
+
+---
+
+## Modes
+
+<CardGroup cols={3}>
+  <Card title="doorman audit" icon="magnifying-glass" href="/commands/audit">
+    One-shot health check. Prints a report and exits with a status code. Use in CI/CD or when debugging an incident.
+  </Card>
+  <Card title="doorman watch" icon="eye" href="/commands/watch">
+    Live dashboard that refreshes every N seconds. Use during an incident when you want to see changes in real time.
+  </Card>
+  <Card title="doorman agent" icon="server" href="/commands/agent">
+    Continuous monitoring daemon. Runs in the background and sends metrics to doorman.com for persistent monitoring and alerts.
+  </Card>
+</CardGroup>
+
+---
+
+## Privacy
+
+The agent never accesses task arguments, results, or payloads. Worker names and task IDs are hashed. Task signatures are sanitized to remove emails, UUIDs, and numeric IDs before any data leaves your infrastructure.
+
+See [Privacy & Data](/reference/privacy) for the full breakdown.

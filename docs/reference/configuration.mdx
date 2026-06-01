@@ -1,0 +1,151 @@
+---
+title: Configuration
+description: Full reference for config file and environment variables
+---
+
+## Priority order
+
+Configuration is loaded in this order (later overrides earlier):
+
+1. Built-in defaults
+2. YAML config file (`--config config.yaml`)
+3. Environment variables
+
+---
+
+## Environment variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
+| `CELERY_BROKER_URL` | Celery broker URL | `redis://localhost:6379/0` |
+| `DOORMAN_API_KEY` | API key for doorman.com (agent API mode) | — |
+| `DOORMAN_API_URL` | Backend endpoint override | `https://api.doorman.com` |
+| `DOORMAN_LOCAL_MODE` | Set `true` to disable all API calls | `false` |
+| `CHECK_INTERVAL` | Seconds between collection cycles (agent mode) | `30` |
+| `DOORMAN_SANITIZE_TASK_SIGNATURES` | Set `false` to disable task name sanitization | `true` |
+
+---
+
+## Config file reference
+
+```yaml
+# ── Connections ────────────────────────────────────────────
+
+# Redis URL. Supports redis://, rediss:// (TLS), redis+sentinel://
+redis_url: redis://localhost:6379/0
+
+# Celery broker URL. Usually the same as redis_url.
+celery_broker_url: redis://localhost:6379/0
+
+# The Celery app name. Used to initialize the Celery client.
+celery_app_name: tasks
+
+# ── Behavior ───────────────────────────────────────────────
+
+# Seconds between collection cycles in agent mode.
+check_interval_seconds: 30
+
+# ── Queues ─────────────────────────────────────────────────
+
+# Queues to monitor. Leave empty to auto-discover from workers.
+# Auto-discovery uses `celery inspect active_queues`.
+monitored_queues:
+  - celery
+  - default
+  - emails
+  - notifications
+
+# ── Thresholds ─────────────────────────────────────────────
+
+thresholds:
+  # Triggers QUEUE_BACKLOG_* finding when depth exceeds this.
+  max_queue_size: 1000
+
+  # Triggers QUEUE_SLA_BREACH_* finding when oldest task
+  # has been waiting longer than this (seconds).
+  # Requires DoormanStampPlugin for accurate measurement.
+  max_wait_time_seconds: 60
+
+  # Triggers STUCK_TASK finding when a task has been
+  # executing for longer than this (seconds).
+  max_task_runtime_seconds: 1800  # 30 minutes
+
+  # Queues listed here get HIGH severity on QUEUE_BACKLOG
+  # findings instead of MEDIUM. Use for business-critical queues.
+  critical_queues:
+    - emails
+    - payments
+
+# ── Privacy ────────────────────────────────────────────────
+
+privacy:
+  # When true (default), task signatures are sanitized:
+  # emails, UUIDs, and numeric IDs are replaced with placeholders.
+  # Set false only if you're certain task names contain no PII.
+  sanitize_task_signatures: true
+
+# ── API (for doorman agent API mode) ──────────────────────
+
+# Your doorman.com API key. Can also be set via DOORMAN_API_KEY.
+# api_key: sk_your_key_here
+
+# Override the default API endpoint (advanced).
+# api_url: https://api.doorman.com
+
+# Skip all API calls and only log locally.
+# local_mode: false
+```
+
+---
+
+## Common setups
+
+### Minimal (env vars only)
+
+```bash
+export REDIS_URL=redis://prod-redis:6379/0
+export CELERY_BROKER_URL=redis://prod-redis:6379/0
+doorman audit
+```
+
+### Auto-discovery with custom thresholds
+
+```yaml
+# config.yaml — no monitored_queues means auto-discover from workers
+redis_url: redis://prod-redis:6379/1
+celery_broker_url: redis://prod-redis:6379/1
+monitored_queues: []
+
+thresholds:
+  max_queue_size: 500
+  max_wait_time_seconds: 30
+  critical_queues:
+    - payments
+```
+
+### Redis with password
+
+```yaml
+redis_url: redis://:your-password@prod-redis:6379/0
+celery_broker_url: redis://:your-password@prod-redis:6379/0
+```
+
+Doorman redacts passwords from all log output: `redis://***@prod-redis:6379/0`.
+
+### Redis with TLS
+
+```yaml
+redis_url: rediss://prod-redis:6380/0
+celery_broker_url: rediss://prod-redis:6380/0
+```
+
+### Multiple environments via env vars
+
+```bash
+# staging
+REDIS_URL=redis://staging-redis:6379/0 doorman audit
+
+# production
+REDIS_URL=redis://prod-redis:6379/0 doorman audit --config prod.yaml
+```

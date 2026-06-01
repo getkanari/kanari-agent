@@ -1,0 +1,252 @@
+---
+title: Findings Reference
+description: Every finding Doorman can raise, with causes and fixes
+---
+
+## Overview
+
+Findings are structured health observations. Each one includes:
+
+- **Severity** — how urgent the issue is
+- **Evidence** — the specific metrics that triggered the finding
+- **Probable cause** — the most likely reasons this is happening
+- **Confirm steps** — commands to verify the root cause
+- **Safe fix** — what to do about it
+
+Findings drive the system status and exit code:
+
+| Highest severity | System status | Exit code |
+|-----------------|---------------|-----------|
+| CRITICAL | CRITICAL | 2 |
+| HIGH | DEGRADED | 2 |
+| MEDIUM or LOW | WARNINGS | 1 |
+| No findings | OK | 0 |
+
+---
+
+## REDIS_DOWN
+
+<Info>Severity: **CRITICAL**</Info>
+
+Doorman cannot connect to Redis. No queue metrics are available.
+
+**Probable causes:**
+- Redis process is down
+- Network or firewall blocking the connection
+- Wrong `REDIS_URL`
+
+**Confirm:**
+```bash
+redis-cli -u $REDIS_URL ping
+# Expected: PONG
+```
+
+**Fix:**
+```bash
+# Check Redis status
+systemctl status redis
+
+# Verify URL
+echo $REDIS_URL
+
+# Restart if needed
+systemctl restart redis
+```
+
+---
+
+## NO_WORKERS
+
+<Info>Severity: **CRITICAL**</Info>
+
+No Celery workers are responding. Tasks will queue indefinitely with no processing capacity.
+
+**Probable causes:**
+- All workers have crashed or been stopped
+- `CELERY_BROKER_URL` doesn't match the running broker
+- Workers are running but the broker is unreachable from their side
+
+**Confirm:**
+```bash
+celery -A your_app inspect ping
+```
+
+**Fix:**
+```bash
+# Start a worker
+celery -A your_app worker --loglevel=info
+
+# Check broker URL matches workers
+echo $CELERY_BROKER_URL
+```
+
+---
+
+## WORKER_OFFLINE
+
+<Info>Severity: **CRITICAL**</Info>
+
+A specific worker that was previously registered is not responding to pings.
+
+**Probable causes:**
+- Worker process crashed (check OOM, unhandled exception)
+- Worker was stopped and not restarted
+- Network partition between worker and broker
+
+**Confirm:**
+```bash
+celery -A your_app inspect ping -d worker-name@hostname
+```
+
+**Fix:**
+```bash
+# Check for OOM kill
+dmesg | grep -i "killed process"
+journalctl -u celery --since "1 hour ago" | grep -i "error\|killed"
+
+# Restart the specific worker
+celery -A your_app worker --hostname=worker-name@hostname --loglevel=info
+```
+
+---
+
+## STUCK_TASK
+
+<Info>Severity: **HIGH**</Info>
+
+A task has been running longer than `max_task_runtime_seconds` (default: 30 minutes). The worker slot occupied by this task is blocked.
+
+**Probable causes:**
+- Task is deadlocked waiting on an external resource (database lock, HTTP timeout)
+- Infinite loop in task code
+- Missing `time_limit` on a task that can legitimately hang
+
+**Confirm:**
+```bash
+# See what's active on the stuck worker
+celery -A your_app inspect active -d stuck-worker@hostname
+
+# Check task logs for the task ID shown in evidence
+```
+
+**Fix:**
+```bash
+# Add a timeout to prevent future occurrences
+@app.task(time_limit=300, soft_time_limit=270)
+def your_task():
+    ...
+
+# Revoke the currently stuck task
+celery -A your_app control revoke <task_id> --terminate
+```
+
+---
+
+## QUEUE_BACKLOG_*
+
+<Info>Severity: **HIGH** (critical queues) / **MEDIUM** (regular queues)</Info>
+
+A queue's depth has exceeded `max_queue_size`. Tasks are accumulating faster than workers can process them.
+
+The finding ID includes the queue name: `QUEUE_BACKLOG_EMAILS`, `QUEUE_BACKLOG_CELERY`, etc.
+
+**Probable causes:**
+- Insufficient worker capacity for current load
+- Spike in task production (traffic burst, batch job)
+- Worker(s) offline or processing very slowly
+- All workers busy with a different queue
+
+**Confirm:**
+```bash
+redis-cli LLEN queue-name
+celery -A your_app inspect active
+```
+
+**Fix:**
+```bash
+# Scale workers immediately
+celery -A your_app worker --concurrency=8 --loglevel=info &
+
+# Or increase concurrency on existing workers (via autoscale)
+celery -A your_app worker --autoscale=10,2
+```
+
+---
+
+## QUEUE_SLA_BREACH_*
+
+<Info>Severity: **HIGH**</Info>
+
+The oldest task in a queue has been waiting longer than `max_wait_time_seconds`. Requires [DoormanStampPlugin](/guides/latency-tracking) for accurate measurement.
+
+The finding ID includes the queue name: `QUEUE_SLA_BREACH_EMAILS`, etc.
+
+**Probable causes:**
+- Workers not consuming from this specific queue (routing misconfiguration)
+- All worker slots full with other work
+- Worker process crashed silently
+
+**Confirm:**
+```bash
+# Check which queues workers are subscribed to
+celery -A your_app inspect active_queues
+
+# Inspect the oldest raw message
+redis-cli LINDEX queue-name -1 | python3 -m json.tool
+```
+
+**Fix:**
+```bash
+# Verify workers are subscribed to the right queues
+celery -A your_app worker -Q emails,celery --loglevel=info
+
+# Scale workers for this specific queue
+celery -A your_app worker -Q emails --concurrency=4 --loglevel=info
+```
+
+---
+
+## LATENCY_UNAVAILABLE
+
+<Info>Severity: **MEDIUM**</Info>
+
+Queues have tasks pending but no timestamps are present in the messages. Doorman cannot measure how long tasks have been waiting, so `QUEUE_SLA_BREACH` detection is blind.
+
+**Cause:**
+Celery + Redis doesn't add timestamps to queue messages by default. `task_send_sent_event=True` does not help — it emits events to the Celery event stream, not to the queue messages that Doorman reads.
+
+**Fix:**
+
+Add one line to your Celery app:
+
+```python
+from doorman_agent.stamps import DoormanStampPlugin
+DoormanStampPlugin.install(app)
+```
+
+See the [Latency Tracking guide](/guides/latency-tracking) for full instructions.
+
+---
+
+## HIGH_SATURATION
+
+<Info>Severity: **MEDIUM**</Info>
+
+Workers are above 80% utilization. New tasks will queue instead of executing immediately. If load continues, queues will start growing.
+
+**Evidence fields:** `saturation_pct`, `active`, `concurrency`
+
+**Probable causes:**
+- Sustained high load without enough worker capacity
+- Long-running tasks consuming all slots
+- `worker_prefetch_multiplier > 1` causing tasks to be reserved but not executing
+
+**Fix:**
+```bash
+# Add more workers
+celery -A your_app worker --concurrency=8 &
+
+# Or reduce prefetch to free up slots faster
+# In celery config:
+worker_prefetch_multiplier = 1
+```

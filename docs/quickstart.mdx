@@ -1,0 +1,110 @@
+---
+title: Quickstart
+description: Run your first Celery health check in under 2 minutes
+---
+
+## Prerequisites
+
+- Python 3.9+
+- A running Redis instance
+- Celery 5.2+ workers (they don't need to be healthy — Doorman will tell you if they're not)
+
+---
+
+## 1. Install
+
+```bash
+pip install doorman-agent
+```
+
+---
+
+## 2. Point to your infrastructure
+
+Doorman reads connection URLs from environment variables. No config file needed to get started.
+
+```bash
+export REDIS_URL=redis://your-redis:6379/0
+export CELERY_BROKER_URL=redis://your-redis:6379/0
+```
+
+If your Redis is on localhost with default settings, skip this step — those are the defaults.
+
+---
+
+## 3. Run a health check
+
+```bash
+doorman audit
+```
+
+You'll see a report like this:
+
+```
+🔍 Doorman Audit
+════════════════════════════════════════════════════════════
+
+✅ System: HEALTHY
+
+Infrastructure
+  ✅ Redis: connected
+  ✅ Celery: connected (3 workers)
+
+Workers
+  Status   Worker       Slots   Note
+  ✅       api-worker   2/8     online
+  ✅       email-wrk    1/4     online
+  ⚠️       job-worker   4/4     at capacity
+
+Queues
+  Status   Queue     Pending   Latency
+  ✅       celery    3         unknown
+  ✅       default   0         0s
+  ✅       emails    12        unknown
+
+Metrics
+  📊 Saturation: 43.8% (7/16 slots, headroom: 9 slots)
+  ⏱️  Max Latency: unavailable — enable with: DoormanStampPlugin.install(app)
+  📋 Total Pending: 15 tasks
+
+════════════════════════════════════════════════════════════
+✅ All systems healthy
+Audit completed in 1.2s
+```
+
+---
+
+## 4. Enable latency tracking (recommended)
+
+By default, Celery + Redis doesn't timestamp queued tasks, so Doorman can't measure how long tasks wait. You'll see `latency: unknown` until you add one line to your Celery app:
+
+```python
+from celery import Celery
+from doorman_agent.stamps import DoormanStampPlugin
+
+app = Celery(...)
+DoormanStampPlugin.install(app)  # add this line
+```
+
+After this, Doorman shows real wait times and can alert you when tasks breach your SLA.
+
+See [Latency Tracking](/guides/latency-tracking) for the full guide.
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run a deep audit" icon="microscope" href="/guides/deep-audit">
+    Check your Redis and Celery configuration for common production misconfigurations.
+  </Card>
+  <Card title="Integrate with CI/CD" icon="code-branch" href="/guides/cicd">
+    Use exit codes to fail your pipeline when Celery issues are detected.
+  </Card>
+  <Card title="Understand findings" icon="triangle-exclamation" href="/reference/findings">
+    Learn what each finding means, why it happens, and how to fix it.
+  </Card>
+  <Card title="Configuration reference" icon="gear" href="/reference/configuration">
+    Full reference for config file and environment variables.
+  </Card>
+</CardGroup>
