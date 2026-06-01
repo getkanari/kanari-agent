@@ -1,0 +1,77 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Doorman",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#2563EB",
+    "light": "#60A5FA",
+    "dark": "#1D4ED8",
+    "anchors": {
+      "from": "#2563EB",
+      "to": "#7C3AED"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/herchila/doorman-agent"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "PyPI",
+    "url": "https://pypi.org/project/doorman-agent/"
+  },
+  "tabs": [],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/herchila/doorman-agent"
+    },
+    {
+      "name": "Changelog",
+      "icon": "list",
+      "url": "https://github.com/herchila/doorman-agent/blob/master/CHANGELOG.md"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "Commands",
+      "pages": [
+        "commands/audit",
+        "commands/watch",
+        "commands/agent"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/latency-tracking",
+        "guides/deep-audit",
+        "guides/cicd"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "reference/configuration",
+        "reference/findings",
+        "reference/privacy"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/herchila/doorman-agent"
+  }
+}
