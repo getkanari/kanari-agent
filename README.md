@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/doorman-agent.svg)](https://pypi.org/project/doorman-agent/)
 [![Python versions](https://img.shields.io/pypi/pyversions/doorman-agent.svg)](https://pypi.org/project/doorman-agent/)
-[![CI](https://github.com/herchila/doorman-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/herchila/doorman-agent/actions/workflows/ci.yml)
+[![Tests](https://github.com/herchila/doorman-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/herchila/doorman-agent/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Monitoring agent for Celery + Redis queues. One command to know if your workers are healthy, your queues are draining, and your tasks aren't stuck.
