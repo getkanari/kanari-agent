@@ -4,7 +4,7 @@ Data models for Doorman Agent
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class Config(BaseModel):
     """Complete Doorman configuration"""
 
     # API Connection (required for production)
-    api_key: str | None = None
+    api_key: Optional[str] = None
     api_url: str = "https://api.doorman.com"
 
     # Local mode: skip API, only log metrics
@@ -58,7 +58,7 @@ class QueueMetrics(BaseModel):
 
     name: str
     depth: int = 0
-    oldest_task_age_seconds: float | None = None
+    oldest_task_age_seconds: Optional[float] = None
     latency_mode: str = "none"  # "doorman", "celery_event", "none"
 
 
@@ -68,7 +68,7 @@ class WorkerMetrics(BaseModel):
     name: str
     active_tasks: int = 0
     concurrency: int = 0  # max-concurrency from pool
-    last_heartbeat: str | None = None
+    last_heartbeat: Optional[str] = None
     is_alive: bool = True
 
 
@@ -82,7 +82,7 @@ class SystemMetrics(BaseModel):
     alive_workers: int = 0
     total_concurrency: int = 0  # sum of all workers' max-concurrency
     saturation_pct: float = 0.0  # (active_tasks / total_concurrency) * 100
-    max_latency_sec: float | None = None  # oldest task age across all queues
+    max_latency_sec: Optional[float] = None  # oldest task age across all queues
     queues: list[QueueMetrics] = Field(default_factory=list)
     workers: list[WorkerMetrics] = Field(default_factory=list)
     stuck_tasks: list[dict[str, Any]] = Field(default_factory=list)

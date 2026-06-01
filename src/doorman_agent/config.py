@@ -12,7 +12,7 @@ from doorman_agent.models import AlertThresholds, Config, PrivacyConfig
 try:
     AGENT_VERSION = version("doorman-agent")
 except PackageNotFoundError:
-    AGENT_VERSION = "0.1.0b1"  # fallback for dev installs
+    AGENT_VERSION = "0.1.0"  # fallback for dev installs
 
 # Optional YAML support
 try:
