@@ -42,32 +42,32 @@
     {
       "group": "Get Started",
       "pages": [
-        "introduction",
-        "quickstart"
+        "docs/introduction",
+        "docs/quickstart"
       ]
     },
     {
       "group": "Commands",
       "pages": [
-        "commands/audit",
-        "commands/watch",
-        "commands/agent"
+        "docs/commands/audit",
+        "docs/commands/watch",
+        "docs/commands/agent"
       ]
     },
     {
       "group": "Guides",
       "pages": [
-        "guides/latency-tracking",
-        "guides/deep-audit",
-        "guides/cicd"
+        "docs/guides/latency-tracking",
+        "docs/guides/deep-audit",
+        "docs/guides/cicd"
       ]
     },
     {
       "group": "Reference",
       "pages": [
-        "reference/configuration",
-        "reference/findings",
-        "reference/privacy"
+        "docs/reference/configuration",
+        "docs/reference/findings",
+        "docs/reference/privacy"
       ]
     }
   ],
