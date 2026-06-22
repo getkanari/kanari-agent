@@ -79,6 +79,46 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_upgrade(args: argparse.Namespace) -> None:
+    import json
+    import urllib.error
+    import urllib.request
+    import webbrowser
+
+    from doorman_agent.login import load_doorman_config
+
+    doorman_cfg = load_doorman_config()
+    api_key = doorman_cfg.get("api_key", "")
+    if not api_key:
+        print("❌ No API key found. Run `doorman login` first.")
+        sys.exit(1)
+
+    api_url = getattr(args, "api_url", None) or doorman_cfg.get("api_url", "https://api.doorman.com")
+    plan = getattr(args, "plan", "solo")
+
+    url = f"{api_url}/billing/checkout?plan={plan}"
+    req = urllib.request.Request(
+        url,
+        method="POST",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            checkout_url = data["checkout_url"]
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"❌ Could not create checkout session ({e.code}): {body}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Could not reach {api_url}: {e}")
+        sys.exit(1)
+
+    print(f"\nOpening checkout for the {plan!r} plan...")
+    print(f"If the browser doesn't open: {checkout_url}\n")
+    webbrowser.open(checkout_url)
+
+
 def cmd_agent(args: argparse.Namespace) -> None:
     from kanari_agent.agent import KanariAgent
     from kanari_agent.config import load_config
@@ -130,6 +170,17 @@ def main() -> None:
         "--email", metavar="EMAIL", help="Email address for alert notifications"
     )
     alerts_cfg_p.set_defaults(func=cmd_alerts_configure)
+
+    # ── upgrade ────────────────────────────────────────────────────────────────────
+    upgrade_p = subparsers.add_parser("upgrade", help="Open checkout to subscribe or change plan")
+    upgrade_p.add_argument(
+        "--plan",
+        choices=["solo", "team", "business"],
+        default="solo",
+        help="Plan to subscribe to (default: solo)",
+    )
+    upgrade_p.add_argument("--api-url", default=None, help="Backend URL override")
+    upgrade_p.set_defaults(func=cmd_upgrade)
 
     # ── audit ──────────────────────────────────────────────────────────────────
     audit_p = subparsers.add_parser("audit", help="One-shot health check with TUI report")
