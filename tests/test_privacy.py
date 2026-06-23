@@ -1,5 +1,5 @@
 """
-Privacy guarantee tests for Doorman Agent.
+Privacy guarantee tests for Kanari Agent.
 
 These tests verify that no PII escapes through the API payload under any
 realistic scenario. They complement the unit tests in test_api_client.py by

@@ -81,7 +81,7 @@ def run_audit(
     Run an audit check and print a formatted report.
 
     Args:
-        config: Doorman configuration
+        config: Kanari configuration
         json_output: Print machine-readable JSON to stdout
         md_output: Print Markdown report
         no_color: Disable ANSI colors
@@ -108,7 +108,7 @@ def run_audit(
 
     if not json_output and not md_output:
         console.print()
-        console.print("[bold cyan]🔍 Doorman Audit[/bold cyan]")
+        console.print("[bold cyan]🔍 Kanari Audit[/bold cyan]")
         console.print("[dim]═" * 60 + "[/dim]")
         console.print()
 
@@ -252,7 +252,7 @@ def _print_md_report(
 ) -> None:
     """Print Markdown report to stdout."""
     lines = [
-        f"# Doorman Audit — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"# Kanari Audit — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         "",
         f"**System Status:** {system_status.value}",
         f"**Duration:** {elapsed:.1f}s",
