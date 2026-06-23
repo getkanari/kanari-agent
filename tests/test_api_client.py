@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.api_client module
+Tests for kanari_agent.api_client module
 
 Focuses on privacy/sanitization logic — no external connections needed.
 """

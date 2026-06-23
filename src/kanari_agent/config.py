@@ -1,5 +1,5 @@
 """
-Configuration loading for Doorman Agent
+Configuration loading for Kanari Agent
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def load_config(config_path: str | None = None) -> Config:
             # Map YAML to config dict
             config_data = {
                 "api_key": yaml_config.get("api_key"),
-                "api_url": yaml_config.get("api_url", "https://api.doorman.com"),
+                "api_url": yaml_config.get("api_url", "https://api.getkanari.com"),
                 "local_mode": yaml_config.get("local_mode", False),
                 "redis_url": yaml_config.get("redis_url", "redis://localhost:6379/0"),
                 "celery_broker_url": yaml_config.get(
@@ -74,26 +74,26 @@ def load_config(config_path: str | None = None) -> Config:
                     privacy_data["sanitize_task_signatures"] = p["sanitize_task_signatures"]
                 config_data["privacy"] = PrivacyConfig(**privacy_data)
 
-    # ~/.doorman/config (written by doorman login) overrides config.yaml
-    from kanari_agent.login import load_doorman_config
-    doorman_cfg = load_doorman_config()
-    if doorman_cfg.get("api_key") and not config_data.get("api_key"):
-        config_data["api_key"] = doorman_cfg["api_key"]
-    if doorman_cfg.get("api_url") and not config_data.get("api_url"):
-        config_data["api_url"] = doorman_cfg["api_url"]
+    # ~/.kanari/config (written by kanari login) overrides config.yaml
+    from kanari_agent.login import load_kanari_config
+    kanari_cfg = load_kanari_config()
+    if kanari_cfg.get("api_key") and not config_data.get("api_key"):
+        config_data["api_key"] = kanari_cfg["api_key"]
+    if kanari_cfg.get("api_url") and not config_data.get("api_url"):
+        config_data["api_url"] = kanari_cfg["api_url"]
 
     # Environment variables override everything
-    if os.environ.get("DOORMAN_API_KEY"):
-        config_data["api_key"] = os.environ["DOORMAN_API_KEY"]
-    if os.environ.get("DOORMAN_API_URL"):
-        config_data["api_url"] = os.environ["DOORMAN_API_URL"]
+    if os.environ.get("KANARI_API_KEY"):
+        config_data["api_key"] = os.environ["KANARI_API_KEY"]
+    if os.environ.get("KANARI_API_URL"):
+        config_data["api_url"] = os.environ["KANARI_API_URL"]
     if os.environ.get("REDIS_URL"):
         config_data["redis_url"] = os.environ["REDIS_URL"]
     if os.environ.get("CELERY_BROKER_URL"):
         config_data["celery_broker_url"] = os.environ["CELERY_BROKER_URL"]
 
     # Local mode from env
-    local_mode_env = os.environ.get("DOORMAN_LOCAL_MODE", "").lower()
+    local_mode_env = os.environ.get("KANARI_LOCAL_MODE", "").lower()
     if local_mode_env in ("true", "1", "yes"):
         config_data["local_mode"] = True
 
@@ -101,7 +101,7 @@ def load_config(config_path: str | None = None) -> Config:
         config_data["check_interval_seconds"] = int(os.environ["CHECK_INTERVAL"])
 
     # Privacy settings from env
-    sanitize_env = os.environ.get("DOORMAN_SANITIZE_TASK_SIGNATURES", "").lower()
+    sanitize_env = os.environ.get("KANARI_SANITIZE_TASK_SIGNATURES", "").lower()
     if sanitize_env in ("false", "0", "no"):
         config_data["privacy"] = PrivacyConfig(sanitize_task_signatures=False)
 

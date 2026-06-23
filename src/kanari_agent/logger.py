@@ -1,5 +1,5 @@
 """
-Structured JSON logger for Doorman Agent
+Structured JSON logger for Kanari Agent
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 class StructuredLogger:
     """Logger that emits structured JSON to stdout"""
 
-    def __init__(self, name: str = "doorman-agent"):
+    def __init__(self, name: str = "kanari-agent"):
         self.name = name
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.INFO)

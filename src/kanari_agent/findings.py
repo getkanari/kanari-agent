@@ -1,5 +1,5 @@
 """
-Finding system for Doorman Agent — structured health observations with severity, evidence, and remediation guidance.
+Finding system for Kanari Agent — structured health observations with severity, evidence, and remediation guidance.
 """
 
 from __future__ import annotations
@@ -259,7 +259,7 @@ class FindingsEngine:
                 Finding(
                     id="LATENCY_UNAVAILABLE",
                     severity=Severity.MEDIUM,
-                    title="Latency unavailable — install DoormanStampPlugin to enable",
+                    title="Latency unavailable — install KanariStampPlugin to enable",
                     impact="SLA breach detection is blind; tasks may wait for minutes without alerting.",
                     evidence={
                         "latency_available": False,
@@ -270,14 +270,14 @@ class FindingsEngine:
                         "task_send_sent_event=True does NOT help — it only emits events to the Celery event stream, not to queue messages",
                     ],
                     confirm_steps=[
-                        "Inspect a raw message — look for 'doorman_sent_ts' in headers:",
-                        "redis-cli -n 1 LINDEX <queue_name> -1 | python3 -m json.tool | grep doorman_sent_ts",
+                        "Inspect a raw message — look for 'kanari_sent_ts' in headers:",
+                        "redis-cli -n 1 LINDEX <queue_name> -1 | python3 -m json.tool | grep kanari_sent_ts",
                     ],
                     safe_fix=[
-                        "Add DoormanStampPlugin to your Celery app (one line):\n"
-                        "  from kanari_agent.stamps import DoormanStampPlugin\n"
-                        "  DoormanStampPlugin.install(app)  # before any task is published",
-                        "This uses the before_task_publish signal and adds 'doorman_sent_ts' to every message header.",
+                        "Add KanariStampPlugin to your Celery app (one line):\n"
+                        "  from kanari_agent.stamps import KanariStampPlugin\n"
+                        "  KanariStampPlugin.install(app)  # before any task is published",
+                        "This uses the before_task_publish signal and adds 'kanari_sent_ts' to every message header.",
                         "Note: only NEW tasks published after install will have timestamps.",
                     ],
                 )

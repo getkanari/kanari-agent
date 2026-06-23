@@ -1,5 +1,5 @@
 """
-Magic link authentication and alert configuration for doorman CLI.
+Magic link authentication and alert configuration for kanari CLI.
 """
 
 from __future__ import annotations
@@ -13,28 +13,28 @@ from pathlib import Path
 
 POLL_INTERVAL_SEC = 3
 POLL_TIMEOUT_SEC = 300  # 5 minutes
-DOORMAN_CONFIG_PATH = Path.home() / ".doorman" / "config"
+KANARI_CONFIG_PATH = Path.home() / ".kanari" / "config"
 
 
 # ── Config file helpers ───────────────────────────────────────────────────────
 
-def load_doorman_config() -> dict:
-    """Read ~/.doorman/config. Returns empty dict if file doesn't exist."""
-    if not DOORMAN_CONFIG_PATH.exists():
+def load_kanari_config() -> dict:
+    """Read ~/.kanari/config. Returns empty dict if file doesn't exist."""
+    if not KANARI_CONFIG_PATH.exists():
         return {}
     try:
         import yaml  # type: ignore[import]
-        with open(DOORMAN_CONFIG_PATH) as f:
+        with open(KANARI_CONFIG_PATH) as f:
             return yaml.safe_load(f) or {}
     except Exception:
         return {}
 
 
-def save_doorman_config(api_key: str, api_url: str) -> None:
-    """Write ~/.doorman/config with api_key and api_url."""
-    DOORMAN_CONFIG_PATH.parent.mkdir(exist_ok=True)
-    DOORMAN_CONFIG_PATH.write_text(f"api_key: {api_key}\napi_url: {api_url}\n")
-    DOORMAN_CONFIG_PATH.chmod(0o600)  # owner read/write only — contains a secret
+def save_kanari_config(api_key: str, api_url: str) -> None:
+    """Write ~/.kanari/config with api_key and api_url."""
+    KANARI_CONFIG_PATH.parent.mkdir(exist_ok=True)
+    KANARI_CONFIG_PATH.write_text(f"api_key: {api_key}\napi_url: {api_url}\n")
+    KANARI_CONFIG_PATH.chmod(0o600)  # owner read/write only — contains a secret
 
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -59,10 +59,10 @@ def _get(url: str, timeout: int = 10) -> dict:
         return json.loads(resp.read())
 
 
-# ── doorman login ─────────────────────────────────────────────────────────────
+# ── kanari login ──────────────────────────────────────────────────────────────
 
 def run_login(api_url: str) -> None:
-    """Interactive magic link login. Saves API key to ~/.doorman/config on success."""
+    """Interactive magic link login. Saves API key to ~/.kanari/config on success."""
     try:
         email = input("Enter your email: ").strip()
     except (KeyboardInterrupt, EOFError):
@@ -99,16 +99,16 @@ def run_login(api_url: str) -> None:
 
                 if status == "verified":
                     api_key = resp["api_key"]
-                    save_doorman_config(api_key, api_url)
+                    save_kanari_config(api_key, api_url)
                     masked = f"{api_key[:8]}...{api_key[-4:]}"
                     print(f"✓ Authenticated!")
                     print(f"  API key: {masked}")
-                    print(f"  Saved to {DOORMAN_CONFIG_PATH}\n")
-                    print("  Next step: doorman agent")
+                    print(f"  Saved to {KANARI_CONFIG_PATH}\n")
+                    print("  Next step: kanari agent")
                     return
 
                 elif status == "expired":
-                    print("❌ Link expired. Run doorman login again.")
+                    print("❌ Link expired. Run kanari login again.")
                     sys.exit(1)
 
                 # status == "pending" or "consumed" → keep polling
@@ -128,7 +128,7 @@ def run_login(api_url: str) -> None:
         sys.exit(1)
 
 
-# ── doorman alerts configure ──────────────────────────────────────────────────
+# ── kanari alerts configure ───────────────────────────────────────────────────
 
 def run_alerts_configure(
     api_url: str,
@@ -154,7 +154,7 @@ def run_alerts_configure(
         _post(f"{api_url}/api/v1/settings/alerts", payload, api_key=api_key)
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            print("❌ Invalid API key. Run doorman login first.")
+            print("❌ Invalid API key. Run kanari login first.")
         else:
             print(f"❌ Server error: {e.code} {e.reason}")
         sys.exit(1)

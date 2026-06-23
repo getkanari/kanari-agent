@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.audit module
+Tests for kanari_agent.audit module
 
 Tests analysis logic — no external connections needed.
 """

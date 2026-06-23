@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.collector module
+Tests for kanari_agent.collector module
 
 Uses mocks for Redis and Celery — no external connections needed.
 """

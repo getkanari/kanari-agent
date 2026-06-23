@@ -1,5 +1,5 @@
 """
-Data models for Doorman Agent
+Data models for Kanari Agent
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ class PrivacyConfig(BaseModel):
 
 
 class Config(BaseModel):
-    """Complete Doorman configuration"""
+    """Complete Kanari configuration"""
 
     # API Connection (required for production)
     api_key: Optional[str] = None
-    api_url: str = "https://api.doorman.com"
+    api_url: str = "https://api.getkanari.com"
 
     # Local mode: skip API, only log metrics
     local_mode: bool = False
@@ -59,7 +59,7 @@ class QueueMetrics(BaseModel):
     name: str
     depth: int = 0
     oldest_task_age_seconds: Optional[float] = None
-    latency_mode: str = "none"  # "doorman", "celery_event", "none"
+    latency_mode: str = "none"  # "kanari", "celery_event", "none"
 
 
 class WorkerMetrics(BaseModel):

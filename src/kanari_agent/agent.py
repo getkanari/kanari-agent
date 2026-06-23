@@ -1,5 +1,5 @@
 """
-Main Doorman Agent class
+Main Kanari Agent class
 """
 
 from __future__ import annotations
@@ -16,17 +16,17 @@ from kanari_agent.logger import StructuredLogger
 from kanari_agent.models import Config, SystemMetrics
 
 
-class DoormanAgent:
+class KanariAgent:
     """
-    The Doorman Agent - a lightweight metrics collector.
+    The Kanari Agent - a lightweight metrics collector.
 
-    In API mode: collects metrics and sends to doorman.com API
+    In API mode: collects metrics and sends to getkanari.com API
     In local mode: collects metrics and logs them (no API calls)
     """
 
     def __init__(self, config: Config):
         self.config = config
-        self.logger = StructuredLogger("doorman-agent")
+        self.logger = StructuredLogger("kanari-agent")
         self.collector = MetricsCollector(config, self.logger)
         self.running = False
         self._consecutive_failures = 0
@@ -142,7 +142,7 @@ class DoormanAgent:
 
         # Log startup banner first
         self.logger.info(
-            "Doorman Agent starting",
+            "Kanari Agent starting",
             version=AGENT_VERSION,
             mode=mode,
             check_interval=self.config.check_interval_seconds,
@@ -153,7 +153,7 @@ class DoormanAgent:
         if not self.config.local_mode and self.api_client:
             self.logger.info("Validating API key...")
             if not self.api_client.validate_api_key():
-                self.logger.error("API key validation failed. Please check your DOORMAN_API_KEY.")
+                self.logger.error("API key validation failed. Please check your KANARI_API_KEY.")
                 sys.exit(1)
             self.logger.info("API key validated successfully")
         elif self.config.local_mode:
@@ -185,4 +185,4 @@ class DoormanAgent:
                     break
                 time.sleep(1)
 
-        self.logger.info("Doorman Agent stopped")
+        self.logger.info("Kanari Agent stopped")

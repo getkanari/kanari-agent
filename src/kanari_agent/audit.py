@@ -1,5 +1,5 @@
 """
-Audit report generator for Doorman Agent
+Audit report generator for Kanari Agent
 
 Uses rich library for beautiful terminal output.
 """
@@ -101,7 +101,7 @@ def run_audit(
     from kanari_agent.logger import StructuredLogger
 
     console = Console(no_color=no_color)
-    logger = StructuredLogger("doorman-audit")
+    logger = StructuredLogger("kanari-audit")
     collector = MetricsCollector(config, logger)
 
     start_time = time.time()
@@ -935,7 +935,7 @@ def _print_report(
         # Has pending tasks but can't measure latency — show the fix inline
         console.print(
             "  ⏱️  Max Latency: [yellow]unavailable[/yellow] — "
-            "enable with: [dim]DoormanStampPlugin.install(app)[/dim]  "
+            "enable with: [dim]KanariStampPlugin.install(app)[/dim]  "
             "[dim](see LATENCY_UNAVAILABLE finding)[/dim]"
         )
     else:

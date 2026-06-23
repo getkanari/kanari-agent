@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.cli module (subcommand-based CLI)
+Tests for kanari_agent.cli module (subcommand-based CLI)
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ def _run_main(argv: list[str]):
     """Helper to run cli.main() with given arguments"""
     from kanari_agent.cli import main
 
-    with patch("sys.argv", ["doorman"] + argv):
+    with patch("sys.argv", ["kanari"] + argv):
         main()
 
 
@@ -46,7 +46,7 @@ class TestNoSubcommand:
 
 
 # ---------------------------------------------------------------------------
-# doorman audit
+# kanari audit
 # ---------------------------------------------------------------------------
 
 
@@ -97,7 +97,7 @@ class TestCliAudit:
 
 
 # ---------------------------------------------------------------------------
-# doorman watch
+# kanari watch
 # ---------------------------------------------------------------------------
 
 
@@ -124,7 +124,7 @@ class TestCliWatch:
 
 
 # ---------------------------------------------------------------------------
-# doorman agent
+# kanari agent
 # ---------------------------------------------------------------------------
 
 
@@ -136,7 +136,7 @@ class TestCliAgent:
 
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
-            patch("kanari_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             _run_main(["agent", "--local"])
 
@@ -149,7 +149,7 @@ class TestCliAgent:
 
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
-            patch("kanari_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             with pytest.raises(SystemExit) as exc:
                 _run_main(["agent", "--local"])
@@ -162,7 +162,7 @@ class TestCliAgent:
 
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
-            patch("kanari_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             _run_main(["agent", "--token", "my-secret-key", "--local"])
 

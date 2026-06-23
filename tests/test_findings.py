@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.findings, stamps, and audit JSON output modules
+Tests for kanari_agent.findings, stamps, and audit JSON output modules
 """
 
 from __future__ import annotations
@@ -368,20 +368,20 @@ class TestUrlRedaction:
 
 
 # ---------------------------------------------------------------------------
-# DoormanStampPlugin (stamps.py)
+# KanariStampPlugin (stamps.py)
 # ---------------------------------------------------------------------------
 
 
 class TestStampHeaders:
-    def test_adds_doorman_ts_header(self):
-        from kanari_agent.stamps import DOORMAN_TS_HEADER, stamp_headers
+    def test_adds_kanari_ts_header(self):
+        from kanari_agent.stamps import KANARI_TS_HEADER, stamp_headers
 
         headers: dict = {"lang": "py"}
         result = stamp_headers(headers)
-        assert DOORMAN_TS_HEADER in result
-        assert isinstance(result[DOORMAN_TS_HEADER], float)
+        assert KANARI_TS_HEADER in result
+        assert isinstance(result[KANARI_TS_HEADER], float)
         # Timestamp should be recent (within last 2 seconds)
-        assert abs(result[DOORMAN_TS_HEADER] - time.time()) < 2
+        assert abs(result[KANARI_TS_HEADER] - time.time()) < 2
 
     def test_preserves_existing_headers(self):
         from kanari_agent.stamps import stamp_headers
@@ -392,43 +392,43 @@ class TestStampHeaders:
         assert result["task"] == "my_task"
 
 
-class TestDoormanStampPluginInstall:
+class TestKanariStampPluginInstall:
     def test_install_connects_before_task_publish(self):
         from celery.signals import before_task_publish
 
-        from kanari_agent.stamps import DoormanStampPlugin
+        from kanari_agent.stamps import KanariStampPlugin
 
         app = MagicMock()
         receivers_before = len(before_task_publish.receivers)
-        DoormanStampPlugin.install(app)
+        KanariStampPlugin.install(app)
         assert len(before_task_publish.receivers) > receivers_before
 
     def test_signal_handler_stamps_headers(self):
         from celery.signals import before_task_publish
 
-        from kanari_agent.stamps import DOORMAN_TS_HEADER, DoormanStampPlugin
+        from kanari_agent.stamps import KANARI_TS_HEADER, KanariStampPlugin
 
         app = MagicMock()
-        DoormanStampPlugin.install(app)
+        KanariStampPlugin.install(app)
 
         # Use send() which dispatches to all connected receivers
         headers: dict = {"lang": "py"}
         before_task_publish.send(sender=None, headers=headers)
 
-        assert DOORMAN_TS_HEADER in headers
-        assert isinstance(headers[DOORMAN_TS_HEADER], float)
-        assert headers[DOORMAN_TS_HEADER] > 1_000_000_000  # epoch sanity
+        assert KANARI_TS_HEADER in headers
+        assert isinstance(headers[KANARI_TS_HEADER], float)
+        assert headers[KANARI_TS_HEADER] > 1_000_000_000  # epoch sanity
 
     def test_handler_preserved_from_gc(self):
-        from kanari_agent.stamps import DoormanStampPlugin
+        from kanari_agent.stamps import KanariStampPlugin
 
         app = MagicMock()
-        DoormanStampPlugin.install(app)
-        assert DoormanStampPlugin._handler is not None
+        KanariStampPlugin.install(app)
+        assert KanariStampPlugin._handler is not None
 
 
 # ---------------------------------------------------------------------------
-# doorman audit --json output contract
+# kanari audit --json output contract
 # ---------------------------------------------------------------------------
 
 

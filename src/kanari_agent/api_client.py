@@ -1,5 +1,5 @@
 """
-API Client for communicating with doorman.com
+API Client for communicating with getkanari.com
 """
 
 from __future__ import annotations
@@ -22,11 +22,11 @@ from kanari_agent.models import Config, SystemMetrics
 
 class APIClient:
     """
-    Client for communicating with doorman.com API.
+    Client for communicating with getkanari.com API.
     The agent only collects and sends metrics - the API handles analysis and notifications.
     """
 
-    DEFAULT_API_URL = "https://api.doorman.com"
+    DEFAULT_API_URL = "https://api.getkanari.com"
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class APIClient:
     ):
         self.api_key = api_key
         self.api_url = (api_url or self.DEFAULT_API_URL).rstrip("/")
-        self.logger = logger or StructuredLogger("doorman-api-client")
+        self.logger = logger or StructuredLogger("kanari-api-client")
         self.config = config
         self._session_id = self._generate_session_id()
 
@@ -131,7 +131,7 @@ class APIClient:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "User-Agent": f"doorman-agent/{AGENT_VERSION}",
+            "User-Agent": f"kanari-agent/{AGENT_VERSION}",
             "X-Agent-Session": self._session_id,
         }
 
@@ -145,7 +145,7 @@ class APIClient:
             data = json.dumps(payload).encode("utf-8") if payload else None
             req = urllib.request.Request(url, data=data, headers=self._get_headers(), method=method)
 
-            with urllib.request.urlopen(req, timeout=30) as response:  # nosec B310 — HTTPS only, URL is always https://api.doorman.com
+            with urllib.request.urlopen(req, timeout=30) as response:  # nosec B310 — HTTPS only, URL is always https://api.getkanari.com
                 response_data = json.loads(response.read().decode("utf-8"))
                 return True, response_data
 
@@ -165,7 +165,7 @@ class APIClient:
 
             # Handle specific error codes
             if e.code == 401:
-                self.logger.error("Invalid API key. Please check your DOORMAN_API_KEY.")
+                self.logger.error("Invalid API key. Please check your KANARI_API_KEY.")
             elif e.code == 403:
                 self.logger.error("API key does not have permission for this operation.")
             elif e.code == 429:
