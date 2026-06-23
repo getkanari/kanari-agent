@@ -1,28 +1,28 @@
-# Doorman Agent
+# Kanari Agent
 
-[![PyPI version](https://img.shields.io/pypi/v/doorman-agent.svg)](https://pypi.org/project/doorman-agent/)
-[![Python versions](https://img.shields.io/pypi/pyversions/doorman-agent.svg)](https://pypi.org/project/doorman-agent/)
-[![Tests](https://github.com/herchila/doorman-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/herchila/doorman-agent/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
+[![Python versions](https://img.shields.io/pypi/pyversions/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
+[![Tests](https://github.com/herchila/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/herchila/kanari-agent/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Monitoring agent for Celery + Redis queues. One command to know if your workers are healthy, your queues are draining, and your tasks aren't stuck.
 
 ```bash
-pip install doorman-agent
-doorman audit
+pip install kanari-agent
+kanari audit
 ```
 
 No config file. No API key. No external service. Works against any Celery + Redis setup in seconds.
 
 ---
 
-## Why Doorman?
+## Why Kanari?
 
 **Your workers show as running. Your queue keeps growing. Nobody knows why.**
 
 This is the most common Celery production problem — and the hardest to debug with generic monitoring tools. Datadog and Grafana can tell you CPU and memory, but they don't understand Celery's queue model, worker pool, or task acknowledgment semantics.
 
-Doorman is built specifically for Celery shops. It knows:
+Kanari is built specifically for Celery shops. It knows:
 
 - **Ghost workers** — workers that are alive but stopped consuming after a Redis reconnect
 - **Queue latency** — how long the oldest task has been waiting (not just queue depth)
@@ -31,7 +31,7 @@ Doorman is built specifically for Celery shops. It knows:
 - **Capacity headroom** — how close you are to saturation before new tasks start queuing
 
 ```
-🔍 Doorman Audit
+🔍 Kanari Audit
 ════════════════════════════════════════════════════════════
 
 ✅ System: HEALTHY
@@ -88,7 +88,7 @@ Audit completed in 1.3s
 **1. Install**
 
 ```bash
-pip install doorman-agent
+pip install kanari-agent
 ```
 
 **2. Point to your infrastructure**
@@ -101,7 +101,7 @@ export CELERY_BROKER_URL=redis://your-redis:6379/0
 **3. Run a health check**
 
 ```bash
-doorman audit
+kanari audit
 ```
 
 That's it. No config file needed, no API key, no external dependencies.
@@ -110,16 +110,16 @@ That's it. No config file needed, no API key, no external dependencies.
 
 ## Commands
 
-### `doorman audit`
+### `kanari audit`
 
 One-shot health check. Prints a report and exits with a status code.
 
 ```bash
-doorman audit                        # rich TUI report
-doorman audit --json                 # machine-readable JSON (for CI/scripts)
-doorman audit --md                   # Markdown report
-doorman audit --deep                 # includes Redis + Celery config analysis
-doorman audit --config config.yaml   # use config file
+kanari audit                        # rich TUI report
+kanari audit --json                 # machine-readable JSON (for CI/scripts)
+kanari audit --md                   # Markdown report
+kanari audit --deep                 # includes Redis + Celery config analysis
+kanari audit --config config.yaml   # use config file
 ```
 
 **Exit codes** — integrate directly into CI/CD:
@@ -131,50 +131,50 @@ doorman audit --config config.yaml   # use config file
 | `2` | Critical |
 
 ```bash
-doorman audit --json
+kanari audit --json
 if [ $? -eq 2 ]; then
   echo "Critical Celery issues found — paging on-call"
   exit 1
 fi
 ```
 
-### `doorman watch`
+### `kanari watch`
 
 Live dashboard that clears and refreshes periodically. Useful when debugging an incident.
 
 ```bash
-doorman watch                # refreshes every 5s
-doorman watch --interval 10  # refreshes every 10s
-doorman watch --deep         # includes config analysis on each refresh
+kanari watch                # refreshes every 5s
+kanari watch --interval 10  # refreshes every 10s
+kanari watch --deep         # includes config analysis on each refresh
 ```
 
-### `doorman agent`
+### `kanari agent`
 
-Continuous monitoring loop. Runs until stopped. In local mode it logs structured JSON; in API mode it sends metrics to doorman.com.
+Continuous monitoring loop. Runs until stopped. In local mode it logs structured JSON; in API mode it sends metrics to api.getkanari.com.
 
 ```bash
-doorman agent --local                        # log only, no API calls
-doorman agent --config config.yaml --local   # with config file
-doorman agent --token your-api-key           # sends metrics to doorman.com
+kanari agent --local                        # log only, no API calls
+kanari agent --config config.yaml --local   # with config file
+kanari agent --token your-api-key           # sends metrics to api.getkanari.com
 ```
 
 ---
 
 ## Enable Latency Tracking
 
-By default, Celery + Redis doesn't timestamp tasks when they're queued. Without timestamps, Doorman can't measure how long tasks wait — it can only see queue depth.
+By default, Celery + Redis doesn't timestamp tasks when they're queued. Without timestamps, Kanari can't measure how long tasks wait — it can only see queue depth.
 
 Add one line to your Celery app to unlock accurate latency:
 
 ```python
 from celery import Celery
-from doorman_agent.stamps import DoormanStampPlugin
+from kanari_agent.stamps import KanariStampPlugin
 
 app = Celery(...)
-DoormanStampPlugin.install(app)  # adds doorman_sent_ts header to every task
+KanariStampPlugin.install(app)  # adds kanari_sent_ts header to every task
 ```
 
-After this, `doorman audit` shows real wait times per queue and triggers `QUEUE_SLA_BREACH` findings when tasks wait longer than your configured threshold.
+After this, `kanari audit` shows real wait times per queue and triggers `QUEUE_SLA_BREACH` findings when tasks wait longer than your configured threshold.
 
 > **Note:** Only tasks published _after_ installing the plugin will have timestamps. Tasks already in the queue will show `latency: unknown` until they're consumed and new ones are enqueued.
 
@@ -190,8 +190,8 @@ All settings can be set via environment variables. A config file is optional.
 |----------|-------------|---------|
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
 | `CELERY_BROKER_URL` | Celery broker URL | same as `REDIS_URL` |
-| `DOORMAN_API_KEY` | API key for `doorman agent` API mode | — |
-| `DOORMAN_LOCAL_MODE` | `true` to disable API calls | `false` |
+| `KANARI_API_KEY` | API key for `kanari agent` API mode | — |
+| `KANARI_LOCAL_MODE` | `true` to disable API calls | `false` |
 | `CHECK_INTERVAL` | Seconds between checks (agent mode) | `30` |
 
 ### Config file (optional)
@@ -222,14 +222,14 @@ privacy:
 ```
 
 ```bash
-doorman audit --config config.yaml
+kanari audit --config config.yaml
 ```
 
 ---
 
 ## Findings
 
-Doorman doesn't just show metrics — it tells you what's wrong and how to fix it. Each finding includes the probable cause, commands to confirm it, and a safe fix.
+Kanari doesn't just show metrics — it tells you what's wrong and how to fix it. Each finding includes the probable cause, commands to confirm it, and a safe fix.
 
 | Finding | Severity | What it means |
 |---------|----------|---------------|
@@ -239,14 +239,14 @@ Doorman doesn't just show metrics — it tells you what's wrong and how to fix i
 | `STUCK_TASK` | HIGH | A task has been running longer than `max_task_runtime_seconds` |
 | `QUEUE_BACKLOG_*` | HIGH/MEDIUM | Queue depth exceeds `max_queue_size` |
 | `QUEUE_SLA_BREACH_*` | HIGH | Oldest task waiting longer than `max_wait_time_seconds` |
-| `LATENCY_UNAVAILABLE` | MEDIUM | No timestamps in queue — install `DoormanStampPlugin` |
+| `LATENCY_UNAVAILABLE` | MEDIUM | No timestamps in queue — install `KanariStampPlugin` |
 | `HIGH_SATURATION` | MEDIUM | Worker pool above 80% utilization |
 
 ---
 
 ## Deep Audit
 
-`doorman audit --deep` inspects your Redis and Celery configuration for common production misconfigurations:
+`kanari audit --deep` inspects your Redis and Celery configuration for common production misconfigurations:
 
 | Check | Risk if wrong |
 |-------|---------------|
@@ -264,7 +264,7 @@ Doorman doesn't just show metrics — it tells you what's wrong and how to fix i
 
 The agent never accesses task arguments, results, or payloads. All metadata that could contain PII is sanitized before it leaves your infrastructure:
 
-| Data | Original | What Doorman sees |
+| Data | Original | What Kanari sees |
 |------|----------|-------------------|
 | Worker hostname | `celery@prod-worker-1.internal` | `w-a1b2c3d4` |
 | Task ID | `550e8400-e29b-41d4-a716-446655440000` | `t-8f3a2b1c4d5e` |
@@ -276,7 +276,7 @@ The agent never accesses task arguments, results, or payloads. All metadata that
 To inspect exactly what the agent collects in your environment:
 
 ```bash
-doorman audit --json | python3 -m json.tool
+kanari audit --json | python3 -m json.tool
 ```
 
 ---
@@ -290,15 +290,15 @@ doorman audit --json | python3 -m json.tool
     REDIS_URL: ${{ secrets.REDIS_URL }}
     CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
   run: |
-    pip install doorman-agent
-    doorman audit --json
+    pip install kanari-agent
+    kanari audit --json
 ```
 
 Or in a shell script:
 
 ```bash
 #!/bin/bash
-doorman audit --json
+kanari audit --json
 STATUS=$?
 if [ $STATUS -eq 2 ]; then
   echo "CRITICAL: Celery issues detected"

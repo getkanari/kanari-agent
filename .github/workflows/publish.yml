@@ -30,7 +30,7 @@ jobs:
         run: poetry install --with dev
 
       - name: Run tests
-        run: poetry run pytest --cov=doorman_agent --cov-fail-under=80
+        run: poetry run pytest --cov=kanari_agent --cov-fail-under=80
 
   publish:
     name: Publish to PyPI

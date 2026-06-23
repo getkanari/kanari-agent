@@ -15,7 +15,7 @@
 - `pre-commit run --all-files` must pass before each commit
 - No backward compatibility layer — clean rename
 - Use `sed -i ''` (macOS BSD sed), not `sed -i`
-- Working directory for all commands: `/Users/herchila/Projects/doorman-agent`
+- Working directory for all commands: `/Users/herchila/Projects/kanari-agent`
 - Branch: `feat/kanari-rename`
 
 ---
@@ -23,9 +23,9 @@
 ## Task 1: Module directory rename + import paths
 
 **Files:**
-- Rename: `src/doorman_agent/` → `src/kanari_agent/` (entire directory via `git mv`)
+- Rename: `src/kanari_agent/` → `src/kanari_agent/` (entire directory via `git mv`)
 - Modify: `pyproject.toml` — package name, entry points, packages list, bandit target, repository URL
-- Modify: all `*.py` files — replace `doorman_agent` module paths in imports and `patch()` calls
+- Modify: all `*.py` files — replace `kanari_agent` module paths in imports and `patch()` calls
 
 **Interfaces:**
 - Produces: installable `kanari-agent` package with `kanari` and `kanari-agent` CLI entry points; all `from kanari_agent.X import Y` imports work; 276 tests pass
@@ -33,7 +33,7 @@
 - [ ] **Step 1: Rename the module directory**
 
 ```bash
-git mv src/doorman_agent src/kanari_agent
+git mv src/kanari_agent src/kanari_agent
 ```
 
 Verify it moved:
@@ -48,24 +48,24 @@ Apply all these changes manually (not with sed — the file has complex structur
 
 ```toml
 [tool.poetry]
-name = "kanari-agent"                           # was: doorman-agent
-repository = "https://github.com/getkanari/kanari-agent"  # was: herchila/doorman-agent
-packages = [{include = "kanari_agent", from = "src"}]     # was: doorman_agent
+name = "kanari-agent"                           # was: kanari-agent
+repository = "https://github.com/getkanari/kanari-agent"  # was: herchila/kanari-agent
+packages = [{include = "kanari_agent", from = "src"}]     # was: kanari_agent
 
 [tool.poetry.scripts]
-kanari-agent = "kanari_agent.cli:main"          # was: doorman-agent = "doorman_agent.cli:main"
-kanari = "kanari_agent.cli:main"                # was: doorman = "doorman_agent.cli:main"
+kanari-agent = "kanari_agent.cli:main"          # was: kanari-agent = "kanari_agent.cli:main"
+kanari = "kanari_agent.cli:main"                # was: doorman = "kanari_agent.cli:main"
 
 [tool.bandit]
-targets = ["src/kanari_agent"]                  # was: src/doorman_agent
+targets = ["src/kanari_agent"]                  # was: src/kanari_agent
 ```
 
 - [ ] **Step 3: Update all import statements in source and test files**
 
 ```bash
 find src tests -name "*.py" -exec sed -i '' \
-  -e 's/from doorman_agent\./from kanari_agent\./g' \
-  -e 's/import doorman_agent\b/import kanari_agent/g' \
+  -e 's/from kanari_agent\./from kanari_agent\./g' \
+  -e 's/import kanari_agent\b/import kanari_agent/g' \
   {} \;
 ```
 
@@ -73,15 +73,15 @@ find src tests -name "*.py" -exec sed -i '' \
 
 ```bash
 find tests -name "*.py" -exec sed -i '' \
-  -e 's/patch("doorman_agent\./patch("kanari_agent\./g' \
-  -e "s/patch('doorman_agent\./patch('kanari_agent\./g" \
+  -e 's/patch("kanari_agent\./patch("kanari_agent\./g' \
+  -e "s/patch('kanari_agent\./patch('kanari_agent\./g" \
   {} \;
 ```
 
 - [ ] **Step 5: Update `version()` call in `__init__.py` and `config.py`**
 
 ```bash
-sed -i '' 's/version("doorman-agent")/version("kanari-agent")/g' \
+sed -i '' 's/version("kanari-agent")/version("kanari-agent")/g' \
   src/kanari_agent/__init__.py \
   src/kanari_agent/config.py
 ```
@@ -100,7 +100,7 @@ Expected: installs without error; `kanari --help` and `kanari-agent --help` show
 poetry run pytest -v
 ```
 
-Expected: 276 passed. If any fail they will be import errors — fix the remaining `doorman_agent` reference that the sed missed, then re-run.
+Expected: 276 passed. If any fail they will be import errors — fix the remaining `kanari_agent` reference that the sed missed, then re-run.
 
 - [ ] **Step 8: Run pre-commit**
 
@@ -112,7 +112,7 @@ pre-commit run --all-files
 
 ```bash
 git add -A
-git commit -m "feat: rename module from doorman_agent to kanari_agent"
+git commit -m "feat: rename module from kanari_agent to kanari_agent"
 ```
 
 ---
@@ -131,8 +131,8 @@ git commit -m "feat: rename module from doorman_agent to kanari_agent"
 
 ```bash
 find src/kanari_agent -name "*.py" -exec sed -i '' \
-  -e 's/DoormanStampPlugin/KanariStampPlugin/g' \
-  -e 's/DoormanAgent/KanariAgent/g' \
+  -e 's/KanariStampPlugin/KanariStampPlugin/g' \
+  -e 's/KanariAgent/KanariAgent/g' \
   -e 's/add_doorman_stamp/add_kanari_stamp/g' \
   {} \;
 ```
@@ -141,9 +141,9 @@ find src/kanari_agent -name "*.py" -exec sed -i '' \
 
 ```bash
 find src/kanari_agent -name "*.py" -exec sed -i '' \
-  -e 's/DOORMAN_TS_HEADER/KANARI_TS_HEADER/g' \
+  -e 's/KANARI_TS_HEADER/KANARI_TS_HEADER/g' \
   -e 's/doorman_sent_ts/kanari_sent_ts/g' \
-  -e 's/DOORMAN_CONFIG_PATH/KANARI_CONFIG_PATH/g' \
+  -e 's/KANARI_CONFIG_PATH/KANARI_CONFIG_PATH/g' \
   -e 's/load_doorman_config/load_kanari_config/g' \
   -e 's/save_doorman_config/save_kanari_config/g' \
   -e 's/doorman_cfg/kanari_cfg/g' \
@@ -154,10 +154,10 @@ find src/kanari_agent -name "*.py" -exec sed -i '' \
 
 ```bash
 find src/kanari_agent -name "*.py" -exec sed -i '' \
-  -e 's/DOORMAN_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
-  -e 's/DOORMAN_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
-  -e 's/DOORMAN_API_KEY/KANARI_API_KEY/g' \
-  -e 's/DOORMAN_API_URL/KANARI_API_URL/g' \
+  -e 's/KANARI_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
+  -e 's/KANARI_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
+  -e 's/KANARI_API_KEY/KANARI_API_KEY/g' \
+  -e 's/KANARI_API_URL/KANARI_API_URL/g' \
   {} \;
 ```
 
@@ -174,7 +174,7 @@ Then open `src/kanari_agent/login.py` and manually verify line 16 reads:
 KANARI_CONFIG_PATH = Path.home() / ".kanari" / "config"
 ```
 
-Also update the default API URL in `src/kanari_agent/config.py`. Find the line with `api.doorman.com` and change it to:
+Also update the default API URL in `src/kanari_agent/config.py`. Find the line with `api.getkanari.com` and change it to:
 ```python
 "api_url": yaml_config.get("api_url", "https://api.getkanari.com"),
 ```
@@ -183,12 +183,12 @@ Also update the default API URL in `src/kanari_agent/config.py`. Find the line w
 
 ```bash
 find src/kanari_agent -name "*.py" -exec sed -i '' \
-  -e 's/doorman upgrade/kanari upgrade/g' \
-  -e 's/doorman alerts/kanari alerts/g' \
-  -e 's/doorman login/kanari login/g' \
-  -e 's/doorman agent/kanari agent/g' \
-  -e 's/doorman audit/kanari audit/g' \
-  -e 's/doorman watch/kanari watch/g' \
+  -e 's/kanari upgrade/kanari upgrade/g' \
+  -e 's/kanari alerts/kanari alerts/g' \
+  -e 's/kanari login/kanari login/g' \
+  -e 's/kanari agent/kanari agent/g' \
+  -e 's/kanari audit/kanari audit/g' \
+  -e 's/kanari watch/kanari watch/g' \
   {} \;
 ```
 
@@ -196,13 +196,13 @@ find src/kanari_agent -name "*.py" -exec sed -i '' \
 
 ```bash
 find src/kanari_agent -name "*.py" -exec sed -i '' \
-  -e 's/doorman-agent\//kanari-agent\//g' \
-  -e 's/doorman-agent {/kanari-agent {/g' \
-  -e 's/"doorman-agent"/"kanari-agent"/g' \
-  -e "s/'doorman-agent'/'kanari-agent'/g" \
-  -e 's/Doorman Agent/Kanari Agent/g' \
-  -e 's/Doorman Stamps/Kanari Stamps/g' \
-  -e 's/Doorman timestamp/Kanari timestamp/g' \
+  -e 's/kanari-agent\//kanari-agent\//g' \
+  -e 's/kanari-agent {/kanari-agent {/g' \
+  -e 's/"kanari-agent"/"kanari-agent"/g' \
+  -e "s/'kanari-agent'/'kanari-agent'/g" \
+  -e 's/Kanari Agent/Kanari Agent/g' \
+  -e 's/Kanari Stamps/Kanari Stamps/g' \
+  -e 's/Kanari timestamp/Kanari timestamp/g' \
   -e 's/doorman_sent_ts/kanari_sent_ts/g' \
   {} \;
 ```
@@ -211,12 +211,12 @@ find src/kanari_agent -name "*.py" -exec sed -i '' \
 
 ```bash
 find tests -name "*.py" -exec sed -i '' \
-  -e 's/DoormanAgent/KanariAgent/g' \
-  -e 's/DOORMAN_TS_HEADER/KANARI_TS_HEADER/g' \
-  -e 's/DOORMAN_API_KEY/KANARI_API_KEY/g' \
-  -e 's/DOORMAN_API_URL/KANARI_API_URL/g' \
-  -e 's/DOORMAN_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
-  -e 's/DOORMAN_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
+  -e 's/KanariAgent/KanariAgent/g' \
+  -e 's/KANARI_TS_HEADER/KANARI_TS_HEADER/g' \
+  -e 's/KANARI_API_KEY/KANARI_API_KEY/g' \
+  -e 's/KANARI_API_URL/KANARI_API_URL/g' \
+  -e 's/KANARI_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
+  -e 's/KANARI_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
   -e 's/load_doorman_config/load_kanari_config/g' \
   -e 's/doorman_cfg/kanari_cfg/g' \
   -e 's/api\.doorman\.com/api.getkanari.com/g' \
@@ -231,7 +231,7 @@ grep -rn "doorman" src/ tests/ --include="*.py" | grep -v "\.pyc"
 ```
 
 For any remaining hits: fix them manually. Common survivors:
-- Prose in docstrings: `"""The Doorman Agent..."""` → `"""The Kanari Agent..."""`
+- Prose in docstrings: `"""The Kanari Agent..."""` → `"""The Kanari Agent..."""`
 - Any comment mentioning `doorman` not caught by the sed patterns above
 
 - [ ] **Step 9: Run tests**
@@ -272,24 +272,24 @@ git commit -m "feat: rename all doorman symbols, env vars, and strings to kanari
 find . -name "*.md" -o -name "*.yaml" -o -name "*.yml" | \
   grep -v ".git/" | grep -v "__pycache__" | \
   xargs sed -i '' \
-  -e 's/doorman-agent/kanari-agent/g' \
-  -e 's/doorman_agent/kanari_agent/g' \
-  -e 's/DoormanAgent/KanariAgent/g' \
-  -e 's/DoormanStampPlugin/KanariStampPlugin/g' \
-  -e 's/DOORMAN_API_KEY/KANARI_API_KEY/g' \
-  -e 's/DOORMAN_API_URL/KANARI_API_URL/g' \
-  -e 's/DOORMAN_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
-  -e 's/DOORMAN_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
-  -e 's/DOORMAN_/KANARI_/g' \
-  -e 's|\.doorman/|.kanari/|g' \
-  -e 's/doorman login/kanari login/g' \
-  -e 's/doorman agent/kanari agent/g' \
-  -e 's/doorman audit/kanari audit/g' \
-  -e 's/doorman watch/kanari watch/g' \
-  -e 's/doorman upgrade/kanari upgrade/g' \
-  -e 's/doorman alerts/kanari alerts/g' \
-  -e 's/Doorman Agent/Kanari Agent/g' \
-  -e 's/Doorman /Kanari /g' \
+  -e 's/kanari-agent/kanari-agent/g' \
+  -e 's/kanari_agent/kanari_agent/g' \
+  -e 's/KanariAgent/KanariAgent/g' \
+  -e 's/KanariStampPlugin/KanariStampPlugin/g' \
+  -e 's/KANARI_API_KEY/KANARI_API_KEY/g' \
+  -e 's/KANARI_API_URL/KANARI_API_URL/g' \
+  -e 's/KANARI_LOCAL_MODE/KANARI_LOCAL_MODE/g' \
+  -e 's/KANARI_SANITIZE_TASK_SIGNATURES/KANARI_SANITIZE_TASK_SIGNATURES/g' \
+  -e 's/KANARI_/KANARI_/g' \
+  -e 's|\.kanari/|.kanari/|g' \
+  -e 's/kanari login/kanari login/g' \
+  -e 's/kanari agent/kanari agent/g' \
+  -e 's/kanari audit/kanari audit/g' \
+  -e 's/kanari watch/kanari watch/g' \
+  -e 's/kanari upgrade/kanari upgrade/g' \
+  -e 's/kanari alerts/kanari alerts/g' \
+  -e 's/Kanari Agent/Kanari Agent/g' \
+  -e 's/Kanari /Kanari /g' \
   -e 's/api\.doorman\.com/api.getkanari.com/g'
 ```
 
@@ -345,7 +345,7 @@ Expected: `nothing to commit, working tree clean`
 - [ ] **Step 2: Rename the directory**
 
 ```bash
-mv /Users/herchila/Projects/doorman-agent /Users/herchila/Projects/kanari-agent
+mv /Users/herchila/Projects/kanari-agent /Users/herchila/Projects/kanari-agent
 ```
 
 - [ ] **Step 3: Verify git still works from the new path**
@@ -362,7 +362,7 @@ Expected: git works normally; the new path has the full history.
 git remote get-url origin
 ```
 
-If it still shows `doorman-agent`, update:
+If it still shows `kanari-agent`, update:
 ```bash
 git remote set-url origin git@github.com:getkanari/kanari-agent.git
 ```
@@ -374,17 +374,17 @@ git remote set-url origin git@github.com:getkanari/kanari-agent.git
 ## Self-Review
 
 **Spec coverage:**
-- ✅ Module directory `src/doorman_agent/` → `src/kanari_agent/` (Task 1)
-- ✅ PyPI package name `doorman-agent` → `kanari-agent` (Task 1)
-- ✅ Entry points `doorman` → `kanari`, `doorman-agent` → `kanari-agent` (Task 1)
-- ✅ `DoormanAgent` → `KanariAgent` (Task 2)
-- ✅ `DoormanStampPlugin` → `KanariStampPlugin` (Task 2)
-- ✅ `DOORMAN_TS_HEADER` → `KANARI_TS_HEADER`, `"doorman_sent_ts"` → `"kanari_sent_ts"` (Task 2)
-- ✅ `DOORMAN_CONFIG_PATH` → `KANARI_CONFIG_PATH`, `~/.doorman/config` → `~/.kanari/config` (Task 2)
+- ✅ Module directory `src/kanari_agent/` → `src/kanari_agent/` (Task 1)
+- ✅ PyPI package name `kanari-agent` → `kanari-agent` (Task 1)
+- ✅ Entry points `doorman` → `kanari`, `kanari-agent` → `kanari-agent` (Task 1)
+- ✅ `KanariAgent` → `KanariAgent` (Task 2)
+- ✅ `KanariStampPlugin` → `KanariStampPlugin` (Task 2)
+- ✅ `KANARI_TS_HEADER` → `KANARI_TS_HEADER`, `"doorman_sent_ts"` → `"kanari_sent_ts"` (Task 2)
+- ✅ `KANARI_CONFIG_PATH` → `KANARI_CONFIG_PATH`, `~/.kanari/config` → `~/.kanari/config` (Task 2)
 - ✅ `load_doorman_config` → `load_kanari_config`, `save_doorman_config` → `save_kanari_config` (Task 2)
-- ✅ `DOORMAN_API_KEY`, `DOORMAN_API_URL`, `DOORMAN_LOCAL_MODE`, `DOORMAN_SANITIZE_TASK_SIGNATURES` → `KANARI_*` (Task 2)
-- ✅ User-visible strings `"doorman login"` etc. → `"kanari login"` etc. (Task 2)
-- ✅ User-Agent and logger name `doorman-agent` → `kanari-agent` (Task 2)
+- ✅ `KANARI_API_KEY`, `KANARI_API_URL`, `KANARI_LOCAL_MODE`, `KANARI_SANITIZE_TASK_SIGNATURES` → `KANARI_*` (Task 2)
+- ✅ User-visible strings `"kanari login"` etc. → `"kanari login"` etc. (Task 2)
+- ✅ User-Agent and logger name `kanari-agent` → `kanari-agent` (Task 2)
 - ✅ Test patch paths (Task 1 + Task 2)
 - ✅ Documentation (Task 3)
 - ✅ Local directory rename (Task 4)

@@ -33,9 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 Initial beta release.
 
 ### Added
-- **`doorman audit`** — one-shot health check with TUI, JSON (`--json`), and Markdown (`--md`) output modes; exits with code 0/1/2 for CI/CD integration
-- **`doorman watch`** — live dashboard that refreshes every N seconds (`--interval`)
-- **`doorman agent`** — continuous monitoring daemon; local mode (`--local`) logs structured JSON, API mode sends metrics to doorman.com
+- **`kanari audit`** — one-shot health check with TUI, JSON (`--json`), and Markdown (`--md`) output modes; exits with code 0/1/2 for CI/CD integration
+- **`kanari watch`** — live dashboard that refreshes every N seconds (`--interval`)
+- **`kanari agent`** — continuous monitoring daemon; local mode (`--local`) logs structured JSON, API mode sends metrics to api.getkanari.com
 - **FindingsEngine** — structured health observations with severity, evidence, probable cause, confirmation steps, and safe fix for each issue:
   - `REDIS_DOWN` (CRITICAL) — Redis unreachable
   - `NO_WORKERS` (CRITICAL) — no Celery workers responding
@@ -45,11 +45,11 @@ Initial beta release.
   - `QUEUE_SLA_BREACH_*` (HIGH) — oldest task waiting longer than SLA
   - `LATENCY_UNAVAILABLE` (MEDIUM) — no timestamps in queue messages
   - `HIGH_SATURATION` (MEDIUM) — worker pool above 80% utilization
-- **`doorman audit --deep`** — configuration analysis for Redis (`maxmemory`, eviction policy, persistence, connection pool) and Celery (`task_acks_late`, `task_reject_on_worker_lost`, `prefetch_multiplier`)
-- **DoormanStampPlugin** — optional one-line install that adds `doorman_sent_ts` timestamps to every published task, enabling accurate latency measurement
+- **`kanari audit --deep`** — configuration analysis for Redis (`maxmemory`, eviction policy, persistence, connection pool) and Celery (`task_acks_late`, `task_reject_on_worker_lost`, `prefetch_multiplier`)
+- **KanariStampPlugin** — optional one-line install that adds `kanari_sent_ts` timestamps to every published task, enabling accurate latency measurement
 - **Privacy-first design** — worker names hashed (`w-a1b2c3d4`), task IDs hashed (`t-8f3a2b1c`), task signatures sanitized (emails, UUIDs, numeric IDs redacted), task arguments never accessed
 - **Auto-discovery** — when `monitored_queues` is empty, queues are auto-discovered from Celery workers via `inspect.active_queues()`
-- **Subparser-based CLI** — `doorman audit`, `doorman watch`, `doorman agent` replace the previous flat argument structure
+- **Subparser-based CLI** — `kanari audit`, `kanari watch`, `kanari agent` replace the previous flat argument structure
 - **Structured logging** — JSON-formatted logs via `StructuredLogger` throughout
 - **GitHub Actions CI** — matrix testing on Python 3.9–3.12 with ruff, mypy, bandit, and pytest (80% coverage minimum)
 - **GitHub Actions publish** — tag-triggered PyPI publish via OIDC trusted publishing
@@ -60,6 +60,6 @@ Initial beta release.
 
 ---
 
-[Unreleased]: https://github.com/herchila/doorman-agent/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/herchila/doorman-agent/compare/v0.1.0b1...v0.1.0
-[0.1.0b1]: https://github.com/herchila/doorman-agent/releases/tag/v0.1.0b1
+[Unreleased]: https://github.com/herchila/kanari-agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/herchila/kanari-agent/compare/v0.1.0b1...v0.1.0
+[0.1.0b1]: https://github.com/herchila/kanari-agent/releases/tag/v0.1.0b1

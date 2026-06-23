@@ -1,4 +1,4 @@
-# Contributing to Doorman Agent
+# Contributing to Kanari Agent
 
 Thanks for your interest in contributing! This document will help you get started.
 
@@ -14,8 +14,8 @@ Thanks for your interest in contributing! This document will help you get starte
 ### Clone and Install
 
 ```bash
-git clone https://github.com/doorman-io/doorman-agent.git
-cd doorman-agent
+git clone https://github.com/herchila/kanari-agent.git
+cd kanari-agent
 
 # Install dependencies
 poetry install --with dev
@@ -34,7 +34,7 @@ pre-commit install
 poetry run pytest
 
 # Run with coverage
-poetry run pytest --cov=doorman_agent --cov-report=html
+poetry run pytest --cov=kanari_agent --cov-report=html
 
 # Run specific test file
 poetry run pytest tests/test_collector.py -v
@@ -68,14 +68,14 @@ pre-commit run mypy --all-files
 
 ```bash
 # Run agent in local mode (no API calls)
-poetry run doorman-agent --local
+poetry run kanari-agent --local
 
 # Run with custom Redis
-REDIS_URL=redis://localhost:6379/1 poetry run doorman-agent --local
+REDIS_URL=redis://localhost:6379/1 poetry run kanari-agent --local
 
 # Simulation mode (no real Redis/Celery needed)
-poetry run doorman-agent --simulate --workers 2
-poetry run doorman-agent --simulate --workers 0 --enqueue 10
+poetry run kanari-agent --simulate --workers 2
+poetry run kanari-agent --simulate --workers 0 --enqueue 10
 ```
 
 ---
@@ -152,7 +152,7 @@ pre-commit run --all-files
 poetry run pytest
 
 # Check types
-poetry run mypy src/doorman_agent
+poetry run mypy src/kanari_agent
 ```
 
 ### 4. Commit
@@ -196,7 +196,7 @@ Then create a Pull Request on GitHub.
 
 **Do not open public issues for security vulnerabilities.**
 
-Email security@doorman.com with:
+Email security@getkanari.com with:
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact
@@ -207,9 +207,9 @@ We'll respond within 48 hours.
 
 ## Getting Help
 
-- 💬 Discord: [discord.gg/doorman](https://discord.gg/doorman)
-- 🐛 Issues: [GitHub Issues](https://github.com/doorman-io/doorman-agent/issues)
-- 📧 Email: support@doorman.com
+- 💬 Discord: [discord.gg/kanari](https://discord.gg/kanari)
+- 🐛 Issues: [GitHub Issues](https://github.com/herchila/kanari-agent/issues)
+- 📧 Email: support@getkanari.com
 
 --- -->
 

@@ -71,5 +71,6 @@ clean: ## Remove build artifacts and cache files
 	find . -name "htmlcov" -exec rm -rf {} +
 	find . -name ".pytest_cache" -exec rm -rf {} +
 	find . -name ".mypy_cache" -exec rm -rf {} +
+	find . -name ".ruff_cache" -exec rm -rf {} +
 	rm -rf dist/
 	@echo "✅ Clean"

@@ -1,18 +1,18 @@
 # =============================================================================
-# Doorman Agent - Configuration File
+# Kanari Agent - Configuration File
 # =============================================================================
 # Copy this file as config.yaml and adjust according to your environment.
 #
-# Get your API key at: https://doorman.com/dashboard/api-keys
+# Get your API key at: https://getkanari.com/dashboard/api-keys
 
 # -----------------------------------------------------------------------------
 # API Connection
 # -----------------------------------------------------------------------------
-# Your doorman.com API key - recommended to set via DOORMAN_API_KEY env var
-api_key: null  # Or set DOORMAN_API_KEY environment variable
+# Your getkanari.com API key - recommended to set via KANARI_API_KEY env var
+api_key: null  # Or set KANARI_API_KEY environment variable
 
-# API endpoint (default: https://api.doorman.com)
-api_url: "https://api.doorman.com"
+# API endpoint (default: https://api.getkanari.com)
+api_url: "https://api.getkanari.com"
 
 # -----------------------------------------------------------------------------
 # Local Mode
