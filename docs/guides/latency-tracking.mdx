@@ -1,23 +1,23 @@
 ---
 title: Latency Tracking
-description: Enable per-queue wait time measurement with DoormanStampPlugin
+description: Enable per-queue wait time measurement with KanariStampPlugin
 ---
 
 ## The problem
 
-Celery + Redis doesn't timestamp tasks when they're added to the queue. There's no native way to know how long a task has been waiting. Without this, Doorman can only see queue depth — not how old the tasks are.
+Celery + Redis doesn't timestamp tasks when they're added to the queue. There's no native way to know how long a task has been waiting. Without this, Kanari can only see queue depth — not how old the tasks are.
 
 This means `QUEUE_SLA_BREACH` findings are blind by default. A queue with 500 tasks could be processing fine (tasks waiting 2 seconds each) or completely stuck (tasks waiting 10 minutes each). Queue depth alone can't tell you which.
 
 <Warning>
-`task_send_sent_event=True` does **not** help here. That setting emits events to the Celery event stream (used by Flower), but it does not add timestamps to the queue messages themselves. Doorman reads queue messages directly from Redis.
+`task_send_sent_event=True` does **not** help here. That setting emits events to the Celery event stream (used by Flower), but it does not add timestamps to the queue messages themselves. Kanari reads queue messages directly from Redis.
 </Warning>
 
 ---
 
-## The solution: DoormanStampPlugin
+## The solution: KanariStampPlugin
 
-`DoormanStampPlugin` hooks into Celery's `before_task_publish` signal and injects a `doorman_sent_ts` Unix timestamp into every task's headers before it hits Redis. Doorman reads this header to compute exact wait time.
+`KanariStampPlugin` hooks into Celery's `before_task_publish` signal and injects a `kanari_sent_ts` Unix timestamp into every task's headers before it hits Redis. Kanari reads this header to compute exact wait time.
 
 ### Installation
 
@@ -25,10 +25,10 @@ Add one line to your Celery app, after `app = Celery(...)`:
 
 ```python
 from celery import Celery
-from doorman_agent.stamps import DoormanStampPlugin
+from kanari_agent.stamps import KanariStampPlugin
 
 app = Celery("myapp", broker="redis://localhost:6379/0")
-DoormanStampPlugin.install(app)  # add this line
+KanariStampPlugin.install(app)  # add this line
 ```
 
 That's it. All tasks published after this line will carry a timestamp.
@@ -39,7 +39,7 @@ That's it. All tasks published after this line will carry a timestamp.
 # myproject/celery.py
 import os
 from celery import Celery
-from doorman_agent.stamps import DoormanStampPlugin
+from kanari_agent.stamps import KanariStampPlugin
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
 
@@ -47,7 +47,7 @@ app = Celery("myproject")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
-DoormanStampPlugin.install(app)
+KanariStampPlugin.install(app)
 ```
 
 ---
@@ -57,16 +57,16 @@ DoormanStampPlugin.install(app)
 After installing the plugin and publishing a few tasks, inspect a raw message in Redis to confirm the header is present:
 
 ```bash
-redis-cli LINDEX celery -1 | python3 -m json.tool | grep doorman_sent_ts
+redis-cli LINDEX celery -1 | python3 -m json.tool | grep kanari_sent_ts
 ```
 
 You should see something like:
 
 ```json
-"doorman_sent_ts": 1748698921.437
+"kanari_sent_ts": 1748698921.437
 ```
 
-Then run `doorman audit` — latency will now appear in the Queues table:
+Then run `kanari audit` — latency will now appear in the Queues table:
 
 ```
 Queues
@@ -84,7 +84,7 @@ Queues
     Tasks that were already in the queue before you installed the plugin won't have timestamps. They'll continue to show `latency: unknown` until they're consumed and new tasks are published.
   </Accordion>
   <Accordion title="One install per app">
-    Call `DoormanStampPlugin.install(app)` once. Calling it multiple times on the same app attaches duplicate signal handlers and will stamp each task twice (harmless but wasteful).
+    Call `KanariStampPlugin.install(app)` once. Calling it multiple times on the same app attaches duplicate signal handlers and will stamp each task twice (harmless but wasteful).
   </Accordion>
   <Accordion title="Workers don't need the plugin">
     The plugin only needs to be installed where tasks are published (your Django app, your API server, your Beat scheduler). Workers that only consume tasks don't need it.
@@ -100,12 +100,12 @@ The plugin connects to Celery's `before_task_publish` signal:
 ```python
 from celery.signals import before_task_publish
 
-def add_doorman_stamp(headers: dict, **kwargs) -> None:
-    headers["doorman_sent_ts"] = time.time()
+def add_kanari_stamp(headers: dict, **kwargs) -> None:
+    headers["kanari_sent_ts"] = time.time()
 
-before_task_publish.connect(add_doorman_stamp)
+before_task_publish.connect(add_kanari_stamp)
 ```
 
-Doorman's collector reads this header when it inspects the oldest message in each queue via `LINDEX <queue> -1`.
+Kanari's collector reads this header when it inspects the oldest message in each queue via `LINDEX <queue> -1`.
 
-The detection falls back gracefully: if the header is missing, Doorman tries `headers.timestamp` (Celery's native event timestamp, only present if `task_send_sent_event=True`), then `properties.timestamp`, then reports `latency: unknown` and raises a `LATENCY_UNAVAILABLE` finding.
+The detection falls back gracefully: if the header is missing, Kanari tries `headers.timestamp` (Celery's native event timestamp, only present if `task_send_sent_event=True`), then `properties.timestamp`, then reports `latency: unknown` and raises a `LATENCY_UNAVAILABLE` finding.

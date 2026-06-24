@@ -1,11 +1,11 @@
 ---
 title: CI/CD Integration
-description: Use Doorman as a quality gate in your deployment pipeline
+description: Use Kanari as a quality gate in your deployment pipeline
 ---
 
 ## Overview
 
-`doorman audit` exits with a meaningful status code:
+`kanari audit` exits with a meaningful status code:
 
 | Code | Meaning |
 |------|---------|
@@ -35,13 +35,13 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - name: Run Doorman audit
+      - name: Run Kanari audit
         env:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install doorman-agent
-          doorman audit --json
+          pip install kanari-agent
+          kanari audit --json
 ```
 
 ### Pre-deploy gate
@@ -58,8 +58,8 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install doorman-agent
-          doorman audit --json
+          pip install kanari-agent
+          kanari audit --json
           if [ $? -eq 2 ]; then
             echo "❌ Celery is in CRITICAL state. Aborting deploy."
             exit 1
@@ -90,8 +90,8 @@ Check that Celery is still healthy after deploying.
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install doorman-agent
-          doorman audit --json
+          pip install kanari-agent
+          kanari audit --json
 ```
 
 ---
@@ -103,7 +103,7 @@ Check that Celery is still healthy after deploying.
 # deploy.sh
 
 echo "Running Celery health check..."
-doorman audit --json
+kanari audit --json
 STATUS=$?
 
 if [ $STATUS -eq 2 ]; then
@@ -124,7 +124,7 @@ echo "Deploying..."
 Use `--json` to capture structured output for logging or alerting:
 
 ```bash
-AUDIT=$(doorman audit --json)
+AUDIT=$(kanari audit --json)
 STATUS=$(echo $AUDIT | jq -r '.system_status')
 PENDING=$(echo $AUDIT | jq -r '.metrics.total_pending')
 
@@ -147,7 +147,7 @@ docker run --rm \
   -e REDIS_URL=redis://your-redis:6379/0 \
   -e CELERY_BROKER_URL=redis://your-redis:6379/0 \
   python:3.12-slim \
-  sh -c "pip install -q doorman-agent && doorman audit --json"
+  sh -c "pip install -q kanari-agent && kanari audit --json"
 ```
 
 ---
@@ -158,7 +158,7 @@ docker run --rm \
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: doorman-health-check
+  name: kanari-health-check
 spec:
   schedule: "*/10 * * * *"
   jobTemplate:
@@ -166,12 +166,12 @@ spec:
       template:
         spec:
           containers:
-            - name: doorman
+            - name: kanari
               image: python:3.12-slim
               command:
                 - sh
                 - -c
-                - pip install -q doorman-agent && doorman audit --json
+                - pip install -q kanari-agent && kanari audit --json
               env:
                 - name: REDIS_URL
                   valueFrom:

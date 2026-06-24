@@ -38,7 +38,7 @@ Apply these on every task, not just when explicitly asked:
 
 This project is published on PyPI. Hold it to production open source standards:
 
-- **`pip install doorman-agent` must just work.** Dependencies must be pinned with upper bounds only where necessary. Avoid dependency conflicts.
+- **`pip install kanari-agent` must just work.** Dependencies must be pinned with upper bounds only where necessary. Avoid dependency conflicts.
 - **Semantic versioning is a contract.** Breaking changes → major bump. New features → minor. Fixes → patch. Never break it silently.
 - **CHANGELOG matters.** When shipping a release, update `CHANGELOG.md` with user-facing language (what changed and why it matters), not internal implementation details.
 - **README is the landing page.** It must answer: what is this, why should I care, how do I install it, how do I configure it, in under 5 minutes.
@@ -59,8 +59,8 @@ When in doubt, do less and do it better. A small, polished, well-tested module b
 
 ## Project Overview
 
-Doorman Agent is a lightweight monitoring agent for Celery/Redis queues. It collects metrics from Celery workers and Redis queues, then either:
-- **API mode**: Sends metrics to doorman.com for analysis and alerting
+Kanari Agent is a lightweight monitoring agent for Celery/Redis queues. It collects metrics from Celery workers and Redis queues, then either:
+- **API mode**: Sends metrics to api.getkanari.com for analysis and alerting
 - **Local mode**: Logs metrics as structured JSON to stdout (no API calls)
 
 **Python version**: 3.9+ (supports up to 3.13)
@@ -83,7 +83,7 @@ pre-commit install
 poetry run pytest
 
 # Run tests with coverage
-poetry run pytest --cov=doorman_agent --cov-report=html
+poetry run pytest --cov=kanari_agent --cov-report=html
 
 # Run a single test file
 poetry run pytest tests/test_config.py
@@ -107,29 +107,41 @@ ruff check --fix .
 ruff format .
 
 # Run mypy type checker
-mypy src/doorman_agent
+mypy src/kanari_agent
 ```
 
 ### Running the Agent
 ```bash
-# Run in local mode (no API calls, just logging)
-poetry run doorman-agent --config config.yaml --local
+# One-shot health check (no account needed)
+poetry run kanari audit --config config.yaml
 
-# Run once (for testing)
-poetry run doorman-agent --config config.yaml --once
+# Live dashboard (refreshes every 5s)
+poetry run kanari watch --config config.yaml
 
-# Run in API mode (production)
-export DOORMAN_API_KEY=your-api-key
-poetry run doorman-agent --config config.yaml
+# Authenticate and save API key to ~/.kanari/config
+poetry run kanari login
+
+# Configure Slack/email alerts
+poetry run kanari alerts configure --slack-webhook https://hooks.slack.com/...
+
+# Open billing checkout to subscribe
+poetry run kanari upgrade --plan solo
+
+# Run continuous monitoring daemon (API mode)
+export KANARI_API_KEY=your-api-key
+poetry run kanari agent --config config.yaml
+
+# Run in local mode (no API calls, just structured logging)
+poetry run kanari agent --config config.yaml --local
 ```
 
 ## Architecture
 
 ### Core Components
 
-1. **DoormanAgent** (`agent.py`)
+1. **KanariAgent** (`agent.py`)
    - Main orchestrator that runs the monitoring loop
-   - Manages two modes: API mode (sends to doorman.com) and local mode (logs only)
+   - Manages two modes: API mode (sends to api.getkanari.com) and local mode (logs only)
    - Handles graceful shutdown via SIGTERM/SIGINT
    - Tracks consecutive API failures and continues collecting even if API is down
 
@@ -140,7 +152,7 @@ poetry run doorman-agent --config config.yaml
    - Returns `SystemMetrics` containing queue, worker, and anomaly data
 
 3. **APIClient** (`api_client.py`)
-   - Sends metrics to doorman.com API (production mode)
+   - Sends metrics to api.getkanari.com API (production mode)
    - **Privacy-first design**:
      - Hashes worker hostnames (`celery@prod-worker-1` → `w-a1b2c3d4`)
      - Sanitizes task signatures (removes UUIDs, emails, numeric IDs)
@@ -166,7 +178,7 @@ MetricsCollector.collect()
   → detects stuck tasks
   → returns SystemMetrics
 
-DoormanAgent.check_once()
+KanariAgent.check_once()
   → calls collector.collect()
   → logs basic status
   → if local_mode: logs full metrics as JSON
@@ -186,7 +198,9 @@ DoormanAgent.check_once()
 
 Configuration loads in this order (later overrides earlier):
 1. YAML file defaults
-2. Environment variables
+2. `~/.kanari/config` (written by `kanari login`)
+3. Environment variables (`KANARI_API_KEY`, `KANARI_API_URL`, etc.)
+4. Hardcoded defaults (fallback only)
 
 **Important**: If `monitored_queues` is not set in config, queues are auto-discovered from Celery workers using `control.inspect().active_queues()`.
 

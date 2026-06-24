@@ -1,5 +1,5 @@
 """
-Privacy guarantee tests for Doorman Agent.
+Privacy guarantee tests for Kanari Agent.
 
 These tests verify that no PII escapes through the API payload under any
 realistic scenario. They complement the unit tests in test_api_client.py by
@@ -22,8 +22,8 @@ import re
 
 import pytest
 
-from doorman_agent.api_client import APIClient
-from doorman_agent.models import Config, PrivacyConfig, QueueMetrics, SystemMetrics, WorkerMetrics
+from kanari_agent.api_client import APIClient
+from kanari_agent.models import Config, PrivacyConfig, QueueMetrics, SystemMetrics, WorkerMetrics
 
 # ---------------------------------------------------------------------------
 # Patterns that must NEVER appear in any payload string value

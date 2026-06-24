@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "doorman-agent"
+name = "kanari-agent"
 version = "0.1.0"
 description = "Privacy-first monitoring agent for Celery + Redis"
 authors = ["Hernán Chilabert <hchilabert@gmail.com>"]
 readme = "README.md"
 license = "Apache-2.0"
-repository = "https://github.com/herchila/doorman-agent"
+repository = "https://github.com/getkanari/kanari-agent"
 keywords = ["celery", "redis", "monitoring", "alerting", "observability"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: System :: Monitoring",
     "Topic :: System :: Systems Administration",
 ]
-packages = [{include = "doorman_agent", from = "src"}]
+packages = [{include = "kanari_agent", from = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
@@ -44,8 +44,8 @@ bandit = ">=1.7"
 detect-secrets = ">=1.4"
 
 [tool.poetry.scripts]
-doorman-agent = "doorman_agent.cli:main"
-doorman = "doorman_agent.cli:main"
+kanari-agent = "kanari_agent.cli:main"
+kanari = "kanari_agent.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -81,14 +81,20 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+warn_return_any = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+pythonpath = ["src"]
 
 [tool.bandit]
-targets = ["src/doorman_agent"]
+targets = ["src/kanari_agent"]
 skips = ["B101"]
 severity = "medium"
 confidence = "medium"

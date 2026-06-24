@@ -13,7 +13,7 @@ install: ## Install all dependencies (including dev)
 
 # ── Quality ──────────────────────────────────────────────────────────────────
 test: ## Run tests with coverage (fails below 80%)
-	poetry run pytest --cov=doorman_agent --cov-report=term-missing --cov-fail-under=80
+	poetry run pytest --cov=kanari_agent --cov-report=term-missing --cov-fail-under=80
 
 test-path: ## Run tests with path (usage: make test-path path=tests/test_findings.py)
 	poetry run pytest $(path) -s
@@ -25,10 +25,10 @@ format: ## Auto-format code with ruff
 	poetry run ruff format .
 
 typecheck: ## Run mypy type checker
-	poetry run mypy src/doorman_agent
+	poetry run mypy src/kanari_agent
 
 security: ## Run security scan (bandit + detect-secrets)
-	poetry run bandit -c pyproject.toml -r src/doorman_agent
+	poetry run bandit -c pyproject.toml -r src/kanari_agent
 	poetry run detect-secrets-hook --baseline .secrets.baseline
 
 check: lint typecheck security test ## Run lint + typecheck + security + tests (full CI gate)
@@ -48,19 +48,19 @@ publish: build ## Publish to PyPI (use CI instead for production releases)
 
 # ── Dev: Run against local Redis (set REDIS_URL and CELERY_BROKER_URL env vars) ──
 audit: ## One-shot audit report  (e.g. make audit)
-	poetry run doorman audit --config config.yaml
+	poetry run kanari audit --config config.yaml
 
 audit-json: ## Audit with JSON output for CI
-	poetry run doorman audit --config config.yaml --json
+	poetry run kanari audit --config config.yaml --json
 
 audit-deep: ## Audit with Redis/Celery config analysis
-	poetry run doorman audit --config config.yaml --deep
+	poetry run kanari audit --config config.yaml --deep
 
 watch: ## Live dashboard, refreshes every 5s
-	poetry run doorman watch --config config.yaml
+	poetry run kanari watch --config config.yaml
 
 agent: ## Daemon loop (local mode, no API calls)
-	poetry run doorman agent --config config.yaml --local
+	poetry run kanari agent --config config.yaml --local
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts and cache files
@@ -71,5 +71,6 @@ clean: ## Remove build artifacts and cache files
 	find . -name "htmlcov" -exec rm -rf {} +
 	find . -name ".pytest_cache" -exec rm -rf {} +
 	find . -name ".mypy_cache" -exec rm -rf {} +
+	find . -name ".ruff_cache" -exec rm -rf {} +
 	rm -rf dist/
 	@echo "✅ Clean"

@@ -1,14 +1,14 @@
 ---
-title: doorman audit
+title: kanari audit
 description: One-shot health check with exit codes for CI/CD integration
 ---
 
 ## Overview
 
-`doorman audit` connects to your Redis and Celery instances, collects metrics, runs the findings engine, and prints a formatted report. It then exits with a status code that reflects the severity of what it found.
+`kanari audit` connects to your Redis and Celery instances, collects metrics, runs the findings engine, and prints a formatted report. It then exits with a status code that reflects the severity of what it found.
 
 ```bash
-doorman audit
+kanari audit
 ```
 
 ---
@@ -43,7 +43,7 @@ doorman audit
 Rich-formatted report with color-coded status indicators. Best for humans running audits interactively.
 
 ```bash
-doorman audit
+kanari audit
 ```
 
 ### JSON
@@ -51,7 +51,7 @@ doorman audit
 Machine-readable output. Use this in CI scripts, log aggregation, or when piping to other tools.
 
 ```bash
-doorman audit --json
+kanari audit --json
 ```
 
 ```json
@@ -89,7 +89,7 @@ doorman audit --json
 Structured Markdown output. Useful for posting to Slack, GitHub issues, or incident reports.
 
 ```bash
-doorman audit --md
+kanari audit --md
 ```
 
 ---
@@ -97,7 +97,7 @@ doorman audit --md
 ## With a config file
 
 ```bash
-doorman audit --config config.yaml
+kanari audit --config config.yaml
 ```
 
 The config file lets you set custom thresholds, specify which queues to monitor, and configure privacy settings. See [Configuration](/reference/configuration) for the full reference.
@@ -107,7 +107,7 @@ The config file lets you set custom thresholds, specify which queues to monitor,
 ## Deep mode
 
 ```bash
-doorman audit --deep
+kanari audit --deep
 ```
 
 Adds a **Configuration Analysis** section to the report that checks your Redis and Celery settings for common production risks. See [Deep Audit](/guides/deep-audit) for details.
@@ -118,14 +118,14 @@ Adds a **Configuration Analysis** section to the report that checks your Redis a
 
 ```bash
 # Quick check — is anything broken right now?
-doorman audit
+kanari audit
 
 # CI gate — fail pipeline if critical issues found
-doorman audit --json && echo "Celery healthy"
+kanari audit --json && echo "Celery healthy"
 
 # Debug an incident with full config analysis
-doorman audit --deep --no-color 2>&1 | tee incident-$(date +%Y%m%d).log
+kanari audit --deep --no-color 2>&1 | tee incident-$(date +%Y%m%d).log
 
 # Check a specific environment
-REDIS_URL=redis://staging-redis:6379/0 doorman audit
+REDIS_URL=redis://staging-redis:6379/0 kanari audit
 ```

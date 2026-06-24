@@ -1,5 +1,5 @@
 # =============================================================================
-# Celery Doorman - Python Dependencies
+# Kanari Agent - Python Dependencies
 # =============================================================================
 # pip install -r requirements.txt
 

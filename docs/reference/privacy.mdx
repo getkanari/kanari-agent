@@ -1,11 +1,11 @@
 ---
 title: Privacy & Data
-description: What Doorman collects, what it redacts, and how to verify
+description: What Kanari collects, what it redacts, and how to verify
 ---
 
 ## Design principle
 
-Doorman is built for production environments where task arguments, queue payloads, and worker names can contain sensitive data. The agent applies privacy transformations before any data leaves your infrastructure.
+Kanari is built for production environments where task arguments, queue payloads, and worker names can contain sensitive data. The agent applies privacy transformations before any data leaves your infrastructure.
 
 **Task arguments are never accessed.** The agent reads queue messages only to extract metadata (timestamps, task name, task ID). Payload content is never parsed, stored, or transmitted.
 
@@ -107,17 +107,17 @@ This sends task names as-is, which makes findings easier to read.
 Run in local mode with JSON output to inspect exactly what the agent collects in your environment before connecting to any external service:
 
 ```bash
-doorman audit --json | python3 -m json.tool
+kanari audit --json | python3 -m json.tool
 ```
 
 In agent local mode, every cycle's payload is logged to stdout:
 
 ```bash
-doorman agent --local
+kanari agent --local
 ```
 
 ---
 
 ## Data in transit
 
-When using `doorman agent` in API mode, data is sent over HTTPS to `api.doorman.com`. The agent uses Python's stdlib `urllib` (no third-party HTTP library). No data is stored locally between cycles.
+When using `kanari agent` in API mode, data is sent over HTTPS to `api.getkanari.com`. The agent uses Python's stdlib `urllib` (no third-party HTTP library). No data is stored locally between cycles.

@@ -1,6 +1,6 @@
 ---
 title: Findings Reference
-description: Every finding Doorman can raise, with causes and fixes
+description: Every finding Kanari can raise, with causes and fixes
 ---
 
 ## Overview
@@ -28,7 +28,7 @@ Findings drive the system status and exit code:
 
 <Info>Severity: **CRITICAL**</Info>
 
-Doorman cannot connect to Redis. No queue metrics are available.
+Kanari cannot connect to Redis. No queue metrics are available.
 
 **Probable causes:**
 - Redis process is down
@@ -177,7 +177,7 @@ celery -A your_app worker --autoscale=10,2
 
 <Info>Severity: **HIGH**</Info>
 
-The oldest task in a queue has been waiting longer than `max_wait_time_seconds`. Requires [DoormanStampPlugin](/guides/latency-tracking) for accurate measurement.
+The oldest task in a queue has been waiting longer than `max_wait_time_seconds`. Requires [KanariStampPlugin](/guides/latency-tracking) for accurate measurement.
 
 The finding ID includes the queue name: `QUEUE_SLA_BREACH_EMAILS`, etc.
 
@@ -210,18 +210,18 @@ celery -A your_app worker -Q emails --concurrency=4 --loglevel=info
 
 <Info>Severity: **MEDIUM**</Info>
 
-Queues have tasks pending but no timestamps are present in the messages. Doorman cannot measure how long tasks have been waiting, so `QUEUE_SLA_BREACH` detection is blind.
+Queues have tasks pending but no timestamps are present in the messages. Kanari cannot measure how long tasks have been waiting, so `QUEUE_SLA_BREACH` detection is blind.
 
 **Cause:**
-Celery + Redis doesn't add timestamps to queue messages by default. `task_send_sent_event=True` does not help — it emits events to the Celery event stream, not to the queue messages that Doorman reads.
+Celery + Redis doesn't add timestamps to queue messages by default. `task_send_sent_event=True` does not help — it emits events to the Celery event stream, not to the queue messages that Kanari reads.
 
 **Fix:**
 
 Add one line to your Celery app:
 
 ```python
-from doorman_agent.stamps import DoormanStampPlugin
-DoormanStampPlugin.install(app)
+from kanari_agent.stamps import KanariStampPlugin
+KanariStampPlugin.install(app)
 ```
 
 See the [Latency Tracking guide](/guides/latency-tracking) for full instructions.

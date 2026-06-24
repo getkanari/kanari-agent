@@ -1,5 +1,5 @@
 """
-Command-line interface for Doorman Agent
+Command-line interface for Kanari Agent
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from doorman_agent.config import AGENT_VERSION
+from kanari_agent.config import AGENT_VERSION
 
 
 def _add_common_args(parser: argparse.ArgumentParser) -> None:
@@ -17,8 +17,8 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
 
 
 def cmd_audit(args: argparse.Namespace) -> None:
-    from doorman_agent.audit import run_audit
-    from doorman_agent.config import load_config
+    from kanari_agent.audit import run_audit
+    from kanari_agent.config import load_config
 
     config = load_config(args.config)
     exit_code = run_audit(
@@ -33,8 +33,8 @@ def cmd_audit(args: argparse.Namespace) -> None:
 
 
 def cmd_watch(args: argparse.Namespace) -> None:
-    from doorman_agent.audit import run_watch
-    from doorman_agent.config import load_config
+    from kanari_agent.audit import run_watch
+    from kanari_agent.config import load_config
 
     config = load_config(args.config)
     run_watch(
@@ -46,28 +46,30 @@ def cmd_watch(args: argparse.Namespace) -> None:
 
 
 def cmd_login(args: argparse.Namespace) -> None:
-    from doorman_agent.login import load_doorman_config, run_login
+    from kanari_agent.login import load_kanari_config, run_login
 
-    # Use --api-url flag, then ~/.doorman/config, then default
+    # Use --api-url flag, then ~/.kanari/config, then default
     api_url = getattr(args, "api_url", None)
     if not api_url:
-        api_url = load_doorman_config().get("api_url", "https://api.doorman.com")
+        api_url = load_kanari_config().get("api_url", "https://api.getkanari.com")
     run_login(api_url)
 
 
 def cmd_alerts_configure(args: argparse.Namespace) -> None:
-    from doorman_agent.config import load_config
-    from doorman_agent.login import load_doorman_config, run_alerts_configure
+    from kanari_agent.config import load_config
+    from kanari_agent.login import load_kanari_config, run_alerts_configure
 
-    # Resolve API key: flag > env var > ~/.doorman/config > config.yaml
+    # Resolve API key: flag > env var > ~/.kanari/config > config.yaml
     config = load_config(getattr(args, "config", None))
     api_key = config.api_key
     if not api_key:
-        print("❌ No API key found. Run doorman login first.")
+        print("❌ No API key found. Run kanari login first.")
         sys.exit(1)
 
-    doorman_cfg = load_doorman_config()
-    api_url = getattr(args, "api_url", None) or doorman_cfg.get("api_url", "https://api.doorman.com")
+    kanari_cfg = load_kanari_config()
+    api_url = getattr(args, "api_url", None) or kanari_cfg.get(
+        "api_url", "https://api.getkanari.com"
+    )
 
     run_alerts_configure(
         api_url=api_url,
@@ -78,8 +80,8 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
 
 
 def cmd_agent(args: argparse.Namespace) -> None:
-    from doorman_agent.agent import DoormanAgent
-    from doorman_agent.config import load_config
+    from kanari_agent.agent import KanariAgent
+    from kanari_agent.config import load_config
 
     config = load_config(args.config)
     if args.local:
@@ -89,29 +91,30 @@ def cmd_agent(args: argparse.Namespace) -> None:
     if getattr(args, "interval", None):
         config.check_interval_seconds = args.interval
 
-    agent = DoormanAgent(config)
-    if not agent.collector.connect():
-        print("❌ Could not connect to Redis/Celery")
-        sys.exit(1)
+    agent = KanariAgent(config)
     agent.run()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="doorman",
-        description="Doorman — on-call monitoring for Celery + Redis",
+        prog="kanari",
+        description="Kanari — on-call monitoring for Celery + Redis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--version", "-v", action="version", version=f"doorman-agent {AGENT_VERSION}"
+        "--version", "-v", action="version", version=f"kanari-agent {AGENT_VERSION}"
     )
 
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
     subparsers.required = False  # allow --version without subcommand
 
     # ── login ──────────────────────────────────────────────────────────────────
-    login_p = subparsers.add_parser("login", help="Authenticate and save API key to ~/.doorman/config")
-    login_p.add_argument("--api-url", default=None, help="Backend URL (default: https://api.doorman.com)")
+    login_p = subparsers.add_parser(
+        "login", help="Authenticate and save API key to ~/.kanari/config"
+    )
+    login_p.add_argument(
+        "--api-url", default=None, help="Backend URL (default: https://api.getkanari.com)"
+    )
     login_p.set_defaults(func=cmd_login)
 
     # ── alerts ─────────────────────────────────────────────────────────────────
@@ -123,7 +126,9 @@ def main() -> None:
     alerts_cfg_p.add_argument("--config", "-c", help="Path to YAML config file")
     alerts_cfg_p.add_argument("--api-url", default=None, help="Backend URL override")
     alerts_cfg_p.add_argument("--slack-webhook", metavar="URL", help="Slack Incoming Webhook URL")
-    alerts_cfg_p.add_argument("--email", metavar="EMAIL", help="Email address for alert notifications")
+    alerts_cfg_p.add_argument(
+        "--email", metavar="EMAIL", help="Email address for alert notifications"
+    )
     alerts_cfg_p.set_defaults(func=cmd_alerts_configure)
 
     # ── audit ──────────────────────────────────────────────────────────────────
@@ -177,7 +182,7 @@ def main() -> None:
         action="store_true",
         help="Local mode: only log, no API calls",
     )
-    agent_p.add_argument("--token", help="API token (or set DOORMAN_API_KEY)")
+    agent_p.add_argument("--token", help="API token (or set KANARI_API_KEY)")
     agent_p.set_defaults(func=cmd_agent)
 
     args = parser.parse_args()

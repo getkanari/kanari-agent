@@ -19,11 +19,11 @@ Configuration is loaded in this order (later overrides earlier):
 |----------|-------------|---------|
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
 | `CELERY_BROKER_URL` | Celery broker URL | `redis://localhost:6379/0` |
-| `DOORMAN_API_KEY` | API key for doorman.com (agent API mode) | — |
-| `DOORMAN_API_URL` | Backend endpoint override | `https://api.doorman.com` |
-| `DOORMAN_LOCAL_MODE` | Set `true` to disable all API calls | `false` |
+| `KANARI_API_KEY` | API key for getkanari.com (agent API mode) | — |
+| `KANARI_API_URL` | Backend endpoint override | `https://api.getkanari.com` |
+| `KANARI_LOCAL_MODE` | Set `true` to disable all API calls | `false` |
 | `CHECK_INTERVAL` | Seconds between collection cycles (agent mode) | `30` |
-| `DOORMAN_SANITIZE_TASK_SIGNATURES` | Set `false` to disable task name sanitization | `true` |
+| `KANARI_SANITIZE_TASK_SIGNATURES` | Set `false` to disable task name sanitization | `true` |
 
 ---
 
@@ -64,7 +64,7 @@ thresholds:
 
   # Triggers QUEUE_SLA_BREACH_* finding when oldest task
   # has been waiting longer than this (seconds).
-  # Requires DoormanStampPlugin for accurate measurement.
+  # Requires KanariStampPlugin for accurate measurement.
   max_wait_time_seconds: 60
 
   # Triggers STUCK_TASK finding when a task has been
@@ -85,13 +85,13 @@ privacy:
   # Set false only if you're certain task names contain no PII.
   sanitize_task_signatures: true
 
-# ── API (for doorman agent API mode) ──────────────────────
+# ── API (for kanari agent API mode) ──────────────────────
 
-# Your doorman.com API key. Can also be set via DOORMAN_API_KEY.
+# Your getkanari.com API key. Can also be set via KANARI_API_KEY.
 # api_key: sk_your_key_here
 
 # Override the default API endpoint (advanced).
-# api_url: https://api.doorman.com
+# api_url: https://api.getkanari.com
 
 # Skip all API calls and only log locally.
 # local_mode: false
@@ -106,7 +106,7 @@ privacy:
 ```bash
 export REDIS_URL=redis://prod-redis:6379/0
 export CELERY_BROKER_URL=redis://prod-redis:6379/0
-doorman audit
+kanari audit
 ```
 
 ### Auto-discovery with custom thresholds
@@ -131,7 +131,7 @@ redis_url: redis://:your-password@prod-redis:6379/0
 celery_broker_url: redis://:your-password@prod-redis:6379/0
 ```
 
-Doorman redacts passwords from all log output: `redis://***@prod-redis:6379/0`.
+Kanari redacts passwords from all log output: `redis://***@prod-redis:6379/0`.
 
 ### Redis with TLS
 
@@ -144,8 +144,8 @@ celery_broker_url: rediss://prod-redis:6380/0
 
 ```bash
 # staging
-REDIS_URL=redis://staging-redis:6379/0 doorman audit
+REDIS_URL=redis://staging-redis:6379/0 kanari audit
 
 # production
-REDIS_URL=redis://prod-redis:6379/0 doorman audit --config prod.yaml
+REDIS_URL=redis://prod-redis:6379/0 kanari audit --config prod.yaml
 ```

@@ -1,5 +1,5 @@
 """
-Audit report generator for Doorman Agent
+Audit report generator for Kanari Agent
 
 Uses rich library for beautiful terminal output.
 """
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from doorman_agent.models import Config, SystemMetrics
+from kanari_agent.models import Config, SystemMetrics
 
 # Exit codes
 EXIT_HEALTHY = 0
@@ -55,7 +55,7 @@ class AuditResult:
 
 def _status_to_exit_code(status: Any) -> int:
     """Map SystemStatus to exit code."""
-    from doorman_agent.findings import SystemStatus
+    from kanari_agent.findings import SystemStatus
 
     mapping = {
         SystemStatus.OK: EXIT_HEALTHY,
@@ -81,7 +81,7 @@ def run_audit(
     Run an audit check and print a formatted report.
 
     Args:
-        config: Doorman configuration
+        config: Kanari configuration
         json_output: Print machine-readable JSON to stdout
         md_output: Print Markdown report
         no_color: Disable ANSI colors
@@ -96,19 +96,19 @@ def run_audit(
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn
 
-    from doorman_agent.collector import MetricsCollector
-    from doorman_agent.findings import FindingsEngine, compute_system_status
-    from doorman_agent.logger import StructuredLogger
+    from kanari_agent.collector import MetricsCollector
+    from kanari_agent.findings import FindingsEngine, compute_system_status
+    from kanari_agent.logger import StructuredLogger
 
     console = Console(no_color=no_color)
-    logger = StructuredLogger("doorman-audit")
+    logger = StructuredLogger("kanari-audit")
     collector = MetricsCollector(config, logger)
 
     start_time = time.time()
 
     if not json_output and not md_output:
         console.print()
-        console.print("[bold cyan]🔍 Doorman Audit[/bold cyan]")
+        console.print("[bold cyan]🔍 Kanari Audit[/bold cyan]")
         console.print("[dim]═" * 60 + "[/dim]")
         console.print()
 
@@ -211,7 +211,7 @@ def _print_json_output(
     exit_code: int,
 ) -> None:
     """Print JSON summary to stdout."""
-    from doorman_agent.findings import top_findings
+    from kanari_agent.findings import top_findings
 
     top = top_findings(findings, 3)
     top_list = []
@@ -252,7 +252,7 @@ def _print_md_report(
 ) -> None:
     """Print Markdown report to stdout."""
     lines = [
-        f"# Doorman Audit — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"# Kanari Audit — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         "",
         f"**System Status:** {system_status.value}",
         f"**Duration:** {elapsed:.1f}s",
@@ -935,7 +935,7 @@ def _print_report(
         # Has pending tasks but can't measure latency — show the fix inline
         console.print(
             "  ⏱️  Max Latency: [yellow]unavailable[/yellow] — "
-            "enable with: [dim]DoormanStampPlugin.install(app)[/dim]  "
+            "enable with: [dim]KanariStampPlugin.install(app)[/dim]  "
             "[dim](see LATENCY_UNAVAILABLE finding)[/dim]"
         )
     else:

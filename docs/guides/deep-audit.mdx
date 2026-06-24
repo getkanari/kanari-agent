@@ -6,7 +6,7 @@ description: Detect Redis and Celery misconfigurations before they cause inciden
 ## Overview
 
 ```bash
-doorman audit --deep
+kanari audit --deep
 ```
 
 The `--deep` flag adds a **Configuration Analysis** section to the audit report. It inspects your Redis and Celery runtime configuration for settings that are technically valid but will cause problems in production.

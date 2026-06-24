@@ -10,9 +10,9 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from doorman_agent.logger import StructuredLogger
-from doorman_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
-from doorman_agent.stamps import DOORMAN_TS_HEADER
+from kanari_agent.logger import StructuredLogger
+from kanari_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
+from kanari_agent.stamps import KANARI_TS_HEADER
 
 # Optional dependencies - check at runtime
 try:
@@ -45,7 +45,7 @@ class MetricsCollector:
 
     def __init__(self, config: Config, logger: StructuredLogger | None = None):
         self.config = config
-        self.logger = logger or StructuredLogger("doorman-collector")
+        self.logger = logger or StructuredLogger("kanari-collector")
         self.redis_client: Any | None = None
         self.celery_app: Any | None = None
         self._discovered_queues: list[str] = []
@@ -184,13 +184,13 @@ class MetricsCollector:
 
         Celery messages may or may not have timestamps depending on configuration.
         We try multiple strategies:
-        1. Check headers.doorman_sent_ts (Doorman stamp)
+        1. Check headers.kanari_sent_ts (Kanari stamp)
         2. Check headers.timestamp (if task_send_sent_event=True)
         3. Check properties.timestamp
         4. Check headers.eta (for scheduled tasks)
 
         Returns (age_seconds, latency_mode) where latency_mode is one of:
-          "doorman"       — from doorman_sent_ts header
+          "kanari"        — from kanari_sent_ts header
           "celery_event"  — from Celery's built-in timestamp header/property
           "none"          — no timestamp found
         """
@@ -212,12 +212,12 @@ class MetricsCollector:
                 headers = task_data.get("headers", {})
                 properties = task_data.get("properties", {})
 
-                # Strategy 1: Doorman stamp (highest priority)
-                if DOORMAN_TS_HEADER in headers:
-                    ts = headers[DOORMAN_TS_HEADER]
+                # Strategy 1: Kanari stamp (highest priority)
+                if KANARI_TS_HEADER in headers:
+                    ts = headers[KANARI_TS_HEADER]
                     if isinstance(ts, (int, float)):
                         age = time.time() - ts
-                        return max(0, age), "doorman"
+                        return max(0, age), "kanari"
 
                 # Strategy 2: Celery event timestamp in headers
                 timestamp = None

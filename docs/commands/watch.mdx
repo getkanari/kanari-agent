@@ -1,14 +1,14 @@
 ---
-title: doorman watch
+title: kanari watch
 description: Live dashboard that refreshes on a configurable interval
 ---
 
 ## Overview
 
-`doorman watch` runs `doorman audit` in a loop, clearing the screen and refreshing the report on each cycle. Use it during incidents when you want a live view of what's changing.
+`kanari watch` runs `kanari audit` in a loop, clearing the screen and refreshing the report on each cycle. Use it during incidents when you want a live view of what's changing.
 
 ```bash
-doorman watch
+kanari watch
 ```
 
 Press `Ctrl+C` to stop.
@@ -30,13 +30,13 @@ Press `Ctrl+C` to stop.
 
 ```bash
 # Live view, refresh every 5 seconds
-doorman watch
+kanari watch
 
 # Faster refresh during an active incident
-doorman watch --interval 2
+kanari watch --interval 2
 
 # With config file and deep analysis
-doorman watch --config config.yaml --deep --interval 10
+kanari watch --config config.yaml --deep --interval 10
 ```
 
 ---
@@ -45,8 +45,8 @@ doorman watch --config config.yaml --deep --interval 10
 
 | Scenario | Command |
 |----------|---------|
-| Quick check before a deploy | `doorman audit` |
-| CI/CD gate | `doorman audit --json` |
-| Actively watching an incident unfold | `doorman watch --interval 2` |
-| Checking if a fix worked | `doorman watch --interval 5` |
-| Continuous background monitoring | `doorman agent` |
+| Quick check before a deploy | `kanari audit` |
+| CI/CD gate | `kanari audit --json` |
+| Actively watching an incident unfold | `kanari watch --interval 2` |
+| Checking if a fix worked | `kanari watch --interval 5` |
+| Continuous background monitoring | `kanari agent` |

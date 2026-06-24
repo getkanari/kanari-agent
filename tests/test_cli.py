@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.cli module (subcommand-based CLI)
+Tests for kanari_agent.cli module (subcommand-based CLI)
 """
 
 from __future__ import annotations
@@ -8,14 +8,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from doorman_agent.models import Config, SystemMetrics
+from kanari_agent.models import Config, SystemMetrics
 
 
 def _run_main(argv: list[str]):
     """Helper to run cli.main() with given arguments"""
-    from doorman_agent.cli import main
+    from kanari_agent.cli import main
 
-    with patch("sys.argv", ["doorman"] + argv):
+    with patch("sys.argv", ["kanari"] + argv):
         main()
 
 
@@ -46,7 +46,7 @@ class TestNoSubcommand:
 
 
 # ---------------------------------------------------------------------------
-# doorman audit
+# kanari audit
 # ---------------------------------------------------------------------------
 
 
@@ -54,8 +54,8 @@ class TestCliAudit:
     def test_audit_calls_cmd_audit_and_exits(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.cli.cmd_audit") as mock_cmd,
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.cli.cmd_audit") as mock_cmd,
         ):
             mock_cmd.side_effect = SystemExit(0)
             with pytest.raises(SystemExit):
@@ -65,8 +65,8 @@ class TestCliAudit:
     def test_audit_with_json_flag(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.audit.run_audit", return_value=0) as mock_audit,
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0) as mock_audit,
         ):
             with pytest.raises(SystemExit):
                 _run_main(["audit", "--json"])
@@ -77,8 +77,8 @@ class TestCliAudit:
     def test_audit_with_deep_flag(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.audit.run_audit", return_value=0) as mock_audit,
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0) as mock_audit,
         ):
             with pytest.raises(SystemExit):
                 _run_main(["audit", "--deep"])
@@ -88,8 +88,8 @@ class TestCliAudit:
     def test_audit_exit_code_propagated(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.audit.run_audit", return_value=2),
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=2),
         ):
             with pytest.raises(SystemExit) as exc:
                 _run_main(["audit"])
@@ -97,7 +97,7 @@ class TestCliAudit:
 
 
 # ---------------------------------------------------------------------------
-# doorman watch
+# kanari watch
 # ---------------------------------------------------------------------------
 
 
@@ -105,8 +105,8 @@ class TestCliWatch:
     def test_watch_calls_cmd_watch(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.cli.cmd_watch") as mock_cmd,
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.cli.cmd_watch") as mock_cmd,
         ):
             _run_main(["watch"])
         mock_cmd.assert_called_once()
@@ -114,8 +114,8 @@ class TestCliWatch:
     def test_watch_with_interval(self):
         cfg = Config()
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.audit.run_watch") as mock_watch,
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_watch") as mock_watch,
         ):
             _run_main(["watch", "--interval", "10"])
         mock_watch.assert_called_once()
@@ -124,7 +124,7 @@ class TestCliWatch:
 
 
 # ---------------------------------------------------------------------------
-# doorman agent
+# kanari agent
 # ---------------------------------------------------------------------------
 
 
@@ -132,37 +132,38 @@ class TestCliAgent:
     def test_agent_local_mode_calls_run(self):
         cfg = Config(local_mode=True)
         mock_agent = MagicMock()
-        mock_agent.collector.connect.return_value = True
 
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             _run_main(["agent", "--local"])
 
         mock_agent.run.assert_called_once()
 
     def test_agent_connect_failure_exits(self):
+        # Connection error handling lives in agent.run(); cmd_agent delegates entirely to run().
         cfg = Config(local_mode=True)
         mock_agent = MagicMock()
-        mock_agent.collector.connect.return_value = False
+        mock_agent.run.side_effect = SystemExit(1)
 
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             with pytest.raises(SystemExit) as exc:
                 _run_main(["agent", "--local"])
+
+        mock_agent.run.assert_called_once()
         assert exc.value.code == 1
 
     def test_agent_with_token(self):
         cfg = Config()
         mock_agent = MagicMock()
-        mock_agent.collector.connect.return_value = True
 
         with (
-            patch("doorman_agent.config.load_config", return_value=cfg),
-            patch("doorman_agent.agent.DoormanAgent", return_value=mock_agent),
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.agent.KanariAgent", return_value=mock_agent),
         ):
             _run_main(["agent", "--token", "my-secret-key", "--local"])
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Doorman",
+  "name": "Kanari",
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
@@ -18,24 +18,24 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/herchila/doorman-agent"
+      "url": "https://github.com/herchila/kanari-agent"
     }
   ],
   "topbarCtaButton": {
     "name": "PyPI",
-    "url": "https://pypi.org/project/doorman-agent/"
+    "url": "https://pypi.org/project/kanari-agent/"
   },
   "tabs": [],
   "anchors": [
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/herchila/doorman-agent"
+      "url": "https://github.com/herchila/kanari-agent"
     },
     {
       "name": "Changelog",
       "icon": "list",
-      "url": "https://github.com/herchila/doorman-agent/blob/master/CHANGELOG.md"
+      "url": "https://github.com/herchila/kanari-agent/blob/master/CHANGELOG.md"
     }
   ],
   "navigation": [
@@ -74,6 +74,6 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/herchila/doorman-agent"
+    "github": "https://github.com/herchila/kanari-agent"
   }
 }

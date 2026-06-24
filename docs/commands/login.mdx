@@ -1,14 +1,14 @@
 ---
-title: doorman login
-description: Authenticate and save your API key to ~/.doorman/config
+title: kanari login
+description: Authenticate and save your API key to ~/.kanari/config
 ---
 
 ## Overview
 
-`doorman login` authenticates you with the Doorman backend via a magic link sent to your email. After verification, the API key is saved automatically to `~/.doorman/config` so you don't need to set environment variables manually.
+`kanari login` authenticates you with the Kanari backend via a magic link sent to your email. After verification, the API key is saved automatically to `~/.kanari/config` so you don't need to set environment variables manually.
 
 ```bash
-doorman login
+kanari login
 ```
 
 ---
@@ -16,21 +16,21 @@ doorman login
 ## How it works
 
 1. You enter your email address
-2. Doorman sends you a magic link
+2. Kanari sends you a magic link
 3. You click the link in your email — the browser shows "Verified!"
 4. The terminal receives the confirmation and saves your API key
 
 ```
-$ doorman login
+$ kanari login
 Enter your email: you@company.com
 ✓ Magic link sent — check your inbox
   Waiting for verification...  (Ctrl+C to cancel)
 
 ✓ Authenticated!
   API key: sk_a1b2c3...
-  Saved to ~/.doorman/config
+  Saved to ~/.kanari/config
 
-  Next step: doorman agent
+  Next step: kanari agent
 ```
 
 ---
@@ -39,39 +39,39 @@ Enter your email: you@company.com
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--api-url` | `https://api.doorman.com` | Backend URL. Use `http://localhost:8000` for local dev |
+| `--api-url` | `https://api.getkanari.com` | Backend URL. Use `http://localhost:8000` for local dev |
 
 ---
 
 ## After login
 
-Once authenticated, all Doorman commands automatically use the saved API key — no need to set `DOORMAN_API_KEY` or pass `--token`:
+Once authenticated, all Kanari commands automatically use the saved API key — no need to set `KANARI_API_KEY` or pass `--token`:
 
 ```bash
-doorman agent            # uses ~/.doorman/config automatically
-doorman alerts configure --slack-webhook https://...
+kanari agent            # uses ~/.kanari/config automatically
+kanari alerts configure --slack-webhook https://...
 ```
 
-The saved config is at `~/.doorman/config` and is readable only by your user (`chmod 600`):
+The saved config is at `~/.kanari/config` and is readable only by your user (`chmod 600`):
 
 ```yaml
 api_key: sk_a1b2c3d4...
-api_url: https://api.doorman.com
+api_url: https://api.getkanari.com
 ```
 
 ---
 
 ## Re-authenticating
 
-If you need a new API key, just run `doorman login` again. The existing `~/.doorman/config` will be overwritten.
+If you need a new API key, just run `kanari login` again. The existing `~/.kanari/config` will be overwritten.
 
 ---
 
 ## Key resolution order
 
-When running any Doorman command, the API key is resolved in this order:
+When running any Kanari command, the API key is resolved in this order:
 
 1. `--token` flag (explicit override)
-2. `DOORMAN_API_KEY` environment variable
-3. `~/.doorman/config` (saved by `doorman login`)
+2. `KANARI_API_KEY` environment variable
+3. `~/.kanari/config` (saved by `kanari login`)
 4. `api_key` field in your `config.yaml`

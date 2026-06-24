@@ -7,14 +7,14 @@ description: From install to your first health check in under 2 minutes
 
 - Python 3.9+
 - A running Redis instance
-- Celery 5.2+ workers (they don't need to be healthy — Doorman will tell you if they're not)
+- Celery 5.2+ workers (they don't need to be healthy — Kanari will tell you if they're not)
 
 ---
 
 ## 1. Install
 
 ```bash
-pip install doorman-agent
+pip install kanari-agent
 ```
 
 ---
@@ -33,11 +33,11 @@ If Redis is on localhost with default settings, skip this — those are already 
 ## 3. Run a health check
 
 ```bash
-doorman audit
+kanari audit
 ```
 
 ```
-🔍 Doorman Audit
+🔍 Kanari Audit
 ════════════════════════════════════════════════════════════
 
 ✅ System: HEALTHY
@@ -60,7 +60,7 @@ Queues
 
 Metrics
   📊 Saturation: 43.8% (7/16 slots, headroom: 9 slots)
-  ⏱️  Max Latency: unavailable — enable with: DoormanStampPlugin.install(app)
+  ⏱️  Max Latency: unavailable — enable with: KanariStampPlugin.install(app)
   📋 Total Pending: 15 tasks
 
 ════════════════════════════════════════════════════════════
@@ -72,12 +72,12 @@ That's it for local monitoring. No config file, no account, no external service.
 
 ---
 
-## 4. Connect to Doorman for alerts (optional)
+## 4. Connect to Kanari for alerts (optional)
 
-To get Slack and email alerts when something breaks, connect the agent to your Doorman account:
+To get Slack and email alerts when something breaks, connect the agent to your Kanari account:
 
 ```bash
-doorman login
+kanari login
 ```
 
 Enter your email, click the magic link, and your API key is saved automatically.
@@ -85,14 +85,14 @@ Enter your email, click the magic link, and your API key is saved automatically.
 Then configure where to send alerts:
 
 ```bash
-doorman alerts configure --slack-webhook https://hooks.slack.com/...
-doorman alerts configure --email you@company.com
+kanari alerts configure --slack-webhook https://hooks.slack.com/...
+kanari alerts configure --email you@company.com
 ```
 
 Then run the continuous monitoring agent:
 
 ```bash
-doorman agent
+kanari agent
 ```
 
 The agent runs in the background, collects metrics every 15 seconds, and sends you alerts the moment something goes wrong.

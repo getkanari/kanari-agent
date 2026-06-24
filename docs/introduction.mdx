@@ -3,13 +3,13 @@ title: Introduction
 description: Privacy-first monitoring agent for Celery + Redis queues
 ---
 
-## What is Doorman?
+## What is Kanari?
 
-Doorman is a monitoring agent built specifically for Celery + Redis. It detects the problems that generic monitoring tools miss — ghost workers, queue latency, stuck tasks, and silent task loss — and tells you exactly what's wrong and how to fix it.
+Kanari is a monitoring agent built specifically for Celery + Redis. It detects the problems that generic monitoring tools miss — ghost workers, queue latency, stuck tasks, and silent task loss — and tells you exactly what's wrong and how to fix it.
 
 ```bash
-pip install doorman-agent
-doorman audit
+pip install kanari-agent
+kanari audit
 ```
 
 No config file. No API key. No external service required. Works against any Celery + Redis setup in under a minute.
@@ -27,16 +27,16 @@ The most common Celery production failure looks like this: **workers show as run
 - `task_acks_late=False` means tasks silently vanished on the last deploy
 - Queue latency is spiking but there's no timestamp in the messages to measure it
 
-Datadog sees healthy CPU. Doorman sees the actual problem.
+Datadog sees healthy CPU. Kanari sees the actual problem.
 
 ---
 
 ## How it works
 
-Doorman connects directly to your Redis and Celery instances — the same way your workers do — and collects:
+Kanari connects directly to your Redis and Celery instances — the same way your workers do — and collects:
 
 - **Queue depth** per queue (via Redis `LLEN`)
-- **Queue latency** — age of the oldest waiting task (requires [DoormanStampPlugin](/docs/guides/latency-tracking))
+- **Queue latency** — age of the oldest waiting task (requires [KanariStampPlugin](/docs/guides/latency-tracking))
 - **Worker health** — active tasks, concurrency slots, alive/offline status
 - **Stuck tasks** — tasks running beyond your configured threshold
 - **Configuration risks** — `task_acks_late`, prefetch settings, Redis eviction policy
@@ -48,40 +48,40 @@ It then runs a [findings engine](/docs/reference/findings) that produces structu
 ## Commands
 
 <CardGroup cols={2}>
-  <Card title="doorman audit" icon="magnifying-glass" href="/docs/commands/audit">
+  <Card title="kanari audit" icon="magnifying-glass" href="/docs/commands/audit">
     One-shot health check. Prints a report and exits with a status code. Great for CI/CD or debugging an incident.
   </Card>
-  <Card title="doorman watch" icon="eye" href="/docs/commands/watch">
+  <Card title="kanari watch" icon="eye" href="/docs/commands/watch">
     Live dashboard that refreshes every N seconds. Use during an incident to see changes in real time.
   </Card>
-  <Card title="doorman agent" icon="server" href="/docs/commands/agent">
-    Continuous monitoring daemon. Sends metrics to Doorman for persistent monitoring and Slack/email alerts.
+  <Card title="kanari agent" icon="server" href="/docs/commands/agent">
+    Continuous monitoring daemon. Sends metrics to Kanari for persistent monitoring and Slack/email alerts.
   </Card>
-  <Card title="doorman login" icon="key" href="/docs/commands/login">
-    Authenticate with Doorman via magic link. Saves your API key to ~/.doorman/config automatically.
+  <Card title="kanari login" icon="key" href="/docs/commands/login">
+    Authenticate with Kanari via magic link. Saves your API key to ~/.kanari/config automatically.
   </Card>
 </CardGroup>
 
 ---
 
-## Two ways to use Doorman
+## Two ways to use Kanari
 
 **Without an account — free forever**
 
-`doorman audit` and `doorman watch` work immediately with no account. Just point them at your Redis and Celery and run.
+`kanari audit` and `kanari watch` work immediately with no account. Just point them at your Redis and Celery and run.
 
-**With a Doorman account — alerts + history**
+**With a Kanari account — alerts + history**
 
-`doorman login` connects the agent to your Doorman account. After that, `doorman agent` runs in the background and sends you Slack or email alerts the moment something breaks.
+`kanari login` connects the agent to your Kanari account. After that, `kanari agent` runs in the background and sends you Slack or email alerts the moment something breaks.
 
 ```bash
 # Free: instant health check, no account needed
-doorman audit
+kanari audit
 
 # Paid: continuous monitoring with alerts
-doorman login
-doorman alerts configure --slack-webhook https://...
-doorman agent
+kanari login
+kanari alerts configure --slack-webhook https://...
+kanari agent
 ```
 
 ---

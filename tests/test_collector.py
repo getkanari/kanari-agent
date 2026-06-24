@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.collector module
+Tests for kanari_agent.collector module
 
 Uses mocks for Redis and Celery — no external connections needed.
 """
@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from doorman_agent.collector import MetricsCollector
-from doorman_agent.models import Config
+from kanari_agent.collector import MetricsCollector
+from kanari_agent.models import Config
 
 
 @pytest.fixture
@@ -318,10 +318,10 @@ class TestConnect:
         mock_celery_class = MagicMock()
 
         with (
-            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
-            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
-            patch("doorman_agent.collector.redis", mock_redis_mod),
-            patch("doorman_agent.collector.Celery", mock_celery_class),
+            patch("kanari_agent.collector.REDIS_AVAILABLE", True),
+            patch("kanari_agent.collector.CELERY_AVAILABLE", True),
+            patch("kanari_agent.collector.redis", mock_redis_mod),
+            patch("kanari_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -334,10 +334,10 @@ class TestConnect:
         mock_celery_class = MagicMock()
 
         with (
-            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
-            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
-            patch("doorman_agent.collector.redis", mock_redis_mod),
-            patch("doorman_agent.collector.Celery", mock_celery_class),
+            patch("kanari_agent.collector.REDIS_AVAILABLE", True),
+            patch("kanari_agent.collector.CELERY_AVAILABLE", True),
+            patch("kanari_agent.collector.redis", mock_redis_mod),
+            patch("kanari_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -351,10 +351,10 @@ class TestConnect:
         mock_celery_class.side_effect = Exception("broker error")
 
         with (
-            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
-            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
-            patch("doorman_agent.collector.redis", mock_redis_mod),
-            patch("doorman_agent.collector.Celery", mock_celery_class),
+            patch("kanari_agent.collector.REDIS_AVAILABLE", True),
+            patch("kanari_agent.collector.CELERY_AVAILABLE", True),
+            patch("kanari_agent.collector.redis", mock_redis_mod),
+            patch("kanari_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -363,9 +363,9 @@ class TestConnect:
     def test_connect_redis_not_available(self, collector):
         mock_celery_class = MagicMock()
         with (
-            patch("doorman_agent.collector.REDIS_AVAILABLE", False),
-            patch("doorman_agent.collector.CELERY_AVAILABLE", True),
-            patch("doorman_agent.collector.Celery", mock_celery_class),
+            patch("kanari_agent.collector.REDIS_AVAILABLE", False),
+            patch("kanari_agent.collector.CELERY_AVAILABLE", True),
+            patch("kanari_agent.collector.Celery", mock_celery_class),
         ):
             result = collector.connect()
 
@@ -375,9 +375,9 @@ class TestConnect:
         mock_redis_mod = MagicMock()
         mock_redis_mod.from_url.return_value = MagicMock()
         with (
-            patch("doorman_agent.collector.REDIS_AVAILABLE", True),
-            patch("doorman_agent.collector.CELERY_AVAILABLE", False),
-            patch("doorman_agent.collector.redis", mock_redis_mod),
+            patch("kanari_agent.collector.REDIS_AVAILABLE", True),
+            patch("kanari_agent.collector.CELERY_AVAILABLE", False),
+            patch("kanari_agent.collector.redis", mock_redis_mod),
         ):
             result = collector.connect()
 

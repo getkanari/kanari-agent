@@ -1,18 +1,18 @@
 ---
-title: doorman agent
+title: kanari agent
 description: Continuous monitoring daemon with local logging or cloud alerts
 ---
 
 ## Overview
 
-`doorman agent` runs a continuous monitoring loop. On each cycle it collects metrics and either logs them locally (local mode) or sends them to the Doorman backend for persistent monitoring and alerts (API mode).
+`kanari agent` runs a continuous monitoring loop. On each cycle it collects metrics and either logs them locally (local mode) or sends them to the Kanari backend for persistent monitoring and alerts (API mode).
 
 ```bash
 # Local mode — log metrics as structured JSON, no external calls
-doorman agent --local
+kanari agent --local
 
-# API mode — after running doorman login, no flags needed
-doorman agent
+# API mode — after running kanari login, no flags needed
+kanari agent
 ```
 
 Stop with `Ctrl+C` or `SIGTERM`. The agent handles both gracefully.
@@ -26,7 +26,7 @@ Stop with `Ctrl+C` or `SIGTERM`. The agent handles both gracefully.
 | `--config`, `-c` | — | Path to a YAML config file |
 | `--interval` | `15` | Seconds between collection cycles |
 | `--local`, `-l` | off | Log metrics locally, skip all API calls |
-| `--token` | — | API key override (usually not needed after `doorman login`) |
+| `--token` | — | API key override (usually not needed after `kanari login`) |
 | `--no-color` | off | Disable ANSI colors in log output |
 
 ---
@@ -36,11 +36,11 @@ Stop with `Ctrl+C` or `SIGTERM`. The agent handles both gracefully.
 The agent finds your API key automatically in this order:
 
 1. `--token` flag
-2. `DOORMAN_API_KEY` environment variable
-3. `~/.doorman/config` — saved by `doorman login` ← **recommended**
+2. `KANARI_API_KEY` environment variable
+3. `~/.kanari/config` — saved by `kanari login` ← **recommended**
 4. `api_key` in your `config.yaml`
 
-After running `doorman login`, you never need to set an API key manually.
+After running `kanari login`, you never need to set an API key manually.
 
 ---
 
@@ -49,7 +49,7 @@ After running `doorman login`, you never need to set an API key manually.
 The best way to verify what the agent collects before connecting it to the backend.
 
 ```bash
-doorman agent --local
+kanari agent --local
 ```
 
 Each cycle emits structured JSON to stdout:
@@ -75,21 +75,21 @@ Each cycle emits structured JSON to stdout:
 Pipe to `jq` for filtering:
 
 ```bash
-doorman agent --local | jq '.queues[] | select(.depth > 100)'
+kanari agent --local | jq '.queues[] | select(.depth > 100)'
 ```
 
 ---
 
 ## API mode
 
-API mode sends metrics to the Doorman backend on every cycle. The backend evaluates findings and sends Slack/email alerts when thresholds are breached.
+API mode sends metrics to the Kanari backend on every cycle. The backend evaluates findings and sends Slack/email alerts when thresholds are breached.
 
 ```bash
-# After doorman login — API key is loaded from ~/.doorman/config automatically
-doorman agent
+# After kanari login — API key is loaded from ~/.kanari/config automatically
+kanari agent
 
 # Or with an explicit token
-doorman agent --token sk_your_key_here
+kanari agent --token sk_your_key_here
 ```
 
 On startup the agent validates the API key. If invalid, it exits immediately with a clear error.
@@ -101,15 +101,15 @@ On startup the agent validates the API key. If invalid, it exits immediately wit
 ### systemd
 
 ```ini
-# /etc/systemd/system/doorman-agent.service
+# /etc/systemd/system/kanari-agent.service
 [Unit]
-Description=Doorman Agent — Celery queue monitor
+Description=Kanari Agent — Celery queue monitor
 After=network.target
 
 [Service]
 User=app
-EnvironmentFile=/etc/doorman/env
-ExecStart=/usr/local/bin/doorman agent --config /etc/doorman/config.yaml
+EnvironmentFile=/etc/kanari/env
+ExecStart=/usr/local/bin/kanari agent --config /etc/kanari/config.yaml
 Restart=on-failure
 RestartSec=10
 
@@ -118,35 +118,35 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl enable --now doorman-agent
+sudo systemctl enable --now kanari-agent
 ```
 
 ### Docker
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install doorman-agent
-CMD ["doorman", "agent", "--local"]
+RUN pip install kanari-agent
+CMD ["kanari", "agent", "--local"]
 ```
 
 ```bash
 docker run -e REDIS_URL=redis://your-redis:6379/0 \
            -e CELERY_BROKER_URL=redis://your-redis:6379/0 \
-           -e DOORMAN_API_KEY=sk_your_key \
-           doorman-agent
+           -e KANARI_API_KEY=sk_your_key \
+           kanari-agent
 ```
 
 ### Docker Compose
 
 ```yaml
 services:
-  doorman:
+  kanari:
     image: python:3.12-slim
-    command: sh -c "pip install doorman-agent && doorman agent"
+    command: sh -c "pip install kanari-agent && kanari agent"
     environment:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
-      DOORMAN_API_KEY: sk_your_key
+      KANARI_API_KEY: sk_your_key
     depends_on:
       - redis
     restart: unless-stopped

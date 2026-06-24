@@ -1,13 +1,13 @@
 ---
-title: doorman alerts
+title: kanari alerts
 description: Configure Slack and email alert channels
 ---
 
 ## Overview
 
-`doorman alerts configure` saves your alert channel settings to the Doorman backend. Once configured, you'll receive Slack messages and/or emails when your Celery infrastructure has HIGH or CRITICAL findings.
+`kanari alerts configure` saves your alert channel settings to the Kanari backend. Once configured, you'll receive Slack messages and/or emails when your Celery infrastructure has HIGH or CRITICAL findings.
 
-Requires `doorman login` first.
+Requires `kanari login` first.
 
 ---
 
@@ -16,7 +16,7 @@ Requires `doorman login` first.
 ### Slack
 
 ```bash
-doorman alerts configure --slack-webhook https://hooks.slack.com/services/...
+kanari alerts configure --slack-webhook https://hooks.slack.com/services/...
 ```
 
 To get a Slack webhook URL: go to your Slack workspace → Apps → Incoming Webhooks → Add New Webhook.
@@ -24,13 +24,13 @@ To get a Slack webhook URL: go to your Slack workspace → Apps → Incoming Web
 ### Email
 
 ```bash
-doorman alerts configure --email alerts@company.com
+kanari alerts configure --email alerts@company.com
 ```
 
 ### Both at once
 
 ```bash
-doorman alerts configure \
+kanari alerts configure \
   --slack-webhook https://hooks.slack.com/services/... \
   --email alerts@company.com
 ```
@@ -65,7 +65,7 @@ Worker offline: beat-wrk
 • worker: beat-wrk
 • id_hash: w-a1b2c3d4
 
-doorman · acme-corp · 2026-06-15 14:22 UTC
+kanari · acme-corp · 2026-06-15 14:22 UTC
 ```
 
 ### Email
@@ -76,7 +76,7 @@ Same content as Slack, formatted as HTML.
 
 ## Cooldown
 
-To avoid alert spam, Doorman enforces a **30-minute cooldown** per finding per organization.
+To avoid alert spam, Kanari enforces a **30-minute cooldown** per finding per organization.
 
 - `CRITICAL` findings **always** alert, regardless of cooldown
 - `HIGH` findings alert once every 30 minutes

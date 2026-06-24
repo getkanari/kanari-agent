@@ -1,5 +1,5 @@
 """
-Tests for doorman_agent.audit module
+Tests for kanari_agent.audit module
 
 Tests analysis logic — no external connections needed.
 """
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from doorman_agent.audit import (
+from kanari_agent.audit import (
     EXIT_CRITICAL,
     EXIT_HEALTHY,
     EXIT_WARNING,
@@ -28,7 +28,7 @@ from doorman_agent.audit import (
     _run_config_checks,
     run_audit,
 )
-from doorman_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
+from kanari_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
 
 
 @pytest.fixture
@@ -560,7 +560,7 @@ def _console():
 
 class TestPrintReport:
     def _call(self, result, metrics=None, samples=1, deep=False):
-        from doorman_agent.models import Config
+        from kanari_agent.models import Config
 
         console = _console()
         m = metrics or _metrics(redis_connected=True, celery_connected=True)
@@ -611,7 +611,7 @@ class TestPrintReport:
         self._call(result, deep=True)
 
     def test_report_with_workers_and_queues(self):
-        from doorman_agent.models import QueueMetrics, WorkerMetrics
+        from kanari_agent.models import QueueMetrics, WorkerMetrics
 
         metrics = _metrics(
             redis_connected=True,
@@ -657,12 +657,12 @@ class TestRunAudit:
         return collector
 
     def test_connect_failure_returns_critical(self):
-        from doorman_agent.models import Config
+        from kanari_agent.models import Config
 
         config = Config()
         # MetricsCollector and Console are lazy-imported inside run_audit()
         with (
-            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
             patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = self._mock_collector(connect_ok=False)
@@ -671,7 +671,7 @@ class TestRunAudit:
         assert result == EXIT_CRITICAL
 
     def test_healthy_system_returns_healthy(self):
-        from doorman_agent.models import Config
+        from kanari_agent.models import Config
 
         config = Config()
         metrics = SystemMetrics(
@@ -685,7 +685,7 @@ class TestRunAudit:
         collector.latency_available = False
 
         with (
-            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
             patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = collector
@@ -694,7 +694,7 @@ class TestRunAudit:
         assert result == EXIT_HEALTHY
 
     def test_deep_mode_runs_config_checks(self):
-        from doorman_agent.models import Config
+        from kanari_agent.models import Config
 
         config = Config()
         metrics = SystemMetrics(
@@ -708,7 +708,7 @@ class TestRunAudit:
         collector.latency_available = False
 
         with (
-            patch("doorman_agent.collector.MetricsCollector") as mock_cls,
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
             patch("rich.console.Console", return_value=_console()),
         ):
             mock_cls.return_value = collector

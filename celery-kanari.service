@@ -1,17 +1,17 @@
 # =============================================================================
-# Celery Doorman - Systemd Service
+# Kanari Agent - Systemd Service
 # =============================================================================
-# Install at: /etc/systemd/system/celery-doorman.service
+# Install at: /etc/systemd/system/celery-kanari.service
 #
 # Commands:
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable celery-doorman
-#   sudo systemctl start celery-doorman
-#   sudo journalctl -u celery-doorman -f
+#   sudo systemctl enable celery-kanari
+#   sudo systemctl start celery-kanari
+#   sudo journalctl -u celery-kanari -f
 # =============================================================================
 
 [Unit]
-Description=Celery Doorman - Silent Queue Guardian
+Description=Kanari Agent - Silent Queue Guardian
 After=network.target redis.service
 Wants=redis.service
 
@@ -19,8 +19,8 @@ Wants=redis.service
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/celery-doorman
-ExecStart=/opt/celery-doorman/venv/bin/python celery_doorman.py --config /opt/celery-doorman/config.yaml
+WorkingDirectory=/opt/kanari-agent
+ExecStart=/opt/kanari-agent/venv/bin/python kanari_agent.py --config /opt/kanari-agent/config.yaml
 Restart=always
 RestartSec=10
 
@@ -28,19 +28,19 @@ RestartSec=10
 Environment=PYTHONUNBUFFERED=1
 
 # Optional: Environment variables in separate file
-# EnvironmentFile=/opt/celery-doorman/.env
+# EnvironmentFile=/opt/kanari-agent/.env
 
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=celery-doorman
+SyslogIdentifier=celery-kanari
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/celery-doorman
+ReadWritePaths=/opt/kanari-agent
 
 [Install]
 WantedBy=multi-user.target
