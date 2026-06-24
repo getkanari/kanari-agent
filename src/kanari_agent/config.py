@@ -76,6 +76,7 @@ def load_config(config_path: str | None = None) -> Config:
 
     # ~/.kanari/config (written by kanari login) overrides config.yaml
     from kanari_agent.login import load_kanari_config
+
     kanari_cfg = load_kanari_config()
     if kanari_cfg.get("api_key") and not config_data.get("api_key"):
         config_data["api_key"] = kanari_cfg["api_key"]

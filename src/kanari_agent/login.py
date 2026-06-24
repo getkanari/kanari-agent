@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 POLL_INTERVAL_SEC = 3
 POLL_TIMEOUT_SEC = 300  # 5 minutes
@@ -18,12 +19,14 @@ KANARI_CONFIG_PATH = Path.home() / ".kanari" / "config"
 
 # ── Config file helpers ───────────────────────────────────────────────────────
 
+
 def load_kanari_config() -> dict:
     """Read ~/.kanari/config. Returns empty dict if file doesn't exist."""
     if not KANARI_CONFIG_PATH.exists():
         return {}
     try:
         import yaml  # type: ignore[import]
+
         with open(KANARI_CONFIG_PATH) as f:
             return yaml.safe_load(f) or {}
     except Exception:
@@ -39,7 +42,8 @@ def save_kanari_config(api_key: str, api_url: str) -> None:
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
-def _post(url: str, data: dict, api_key: str | None = None, timeout: int = 10) -> dict:
+
+def _post(url: str, data: dict, api_key: str | None = None, timeout: int = 10) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -50,16 +54,17 @@ def _post(url: str, data: dict, api_key: str | None = None, timeout: int = 10) -
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
-        return json.loads(resp.read())
+        return json.loads(resp.read())  # type: ignore[no-any-return]
 
 
-def _get(url: str, timeout: int = 10) -> dict:
+def _get(url: str, timeout: int = 10) -> dict[str, Any]:
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
-        return json.loads(resp.read())
+        return json.loads(resp.read())  # type: ignore[no-any-return]
 
 
 # ── kanari login ──────────────────────────────────────────────────────────────
+
 
 def run_login(api_url: str) -> None:
     """Interactive magic link login. Saves API key to ~/.kanari/config on success."""
@@ -101,7 +106,7 @@ def run_login(api_url: str) -> None:
                     api_key = resp["api_key"]
                     save_kanari_config(api_key, api_url)
                     masked = f"{api_key[:8]}...{api_key[-4:]}"
-                    print(f"✓ Authenticated!")
+                    print("✓ Authenticated!")
                     print(f"  API key: {masked}")
                     print(f"  Saved to {KANARI_CONFIG_PATH}\n")
                     print("  Next step: kanari agent")
@@ -115,7 +120,7 @@ def run_login(api_url: str) -> None:
 
             except urllib.error.HTTPError:
                 pass  # token not found yet, keep polling
-            except Exception:
+            except Exception:  # nosec B110
                 pass  # network hiccup, keep polling
 
             time.sleep(POLL_INTERVAL_SEC)
@@ -129,6 +134,7 @@ def run_login(api_url: str) -> None:
 
 
 # ── kanari alerts configure ───────────────────────────────────────────────────
+
 
 def run_alerts_configure(
     api_url: str,
@@ -163,7 +169,7 @@ def run_alerts_configure(
         sys.exit(1)
 
     if slack_webhook:
-        print(f"✓ Slack webhook saved.")
+        print("✓ Slack webhook saved.")
     if alert_email:
         print(f"✓ Alert email saved: {alert_email}")
     print("  You'll receive alerts when findings are HIGH or CRITICAL.")

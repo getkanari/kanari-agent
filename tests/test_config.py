@@ -2,7 +2,6 @@
 Tests for kanari_agent.config module
 """
 
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -137,7 +136,7 @@ class TestLoadConfigFromYaml:
     """Tests for loading configuration from YAML files"""
 
     @pytest.fixture
-    def config_file(self, tmp_path) -> Path:
+    def config_file(self, tmp_path: Path) -> Path:
         """Create a temporary config file"""
         config_content = """
 api_key: yaml-api-key
@@ -246,7 +245,7 @@ class TestKanariConfigFile:
         with patch("kanari_agent.login.KANARI_CONFIG_PATH", config_file):
             config = load_config()
 
-        assert config.api_key == "sk_testkey123"
+        assert config.api_key == "sk_testkey123"  # pragma: allowlist secret
         assert config.api_url == "http://localhost:9000"
 
     def test_env_var_overrides_kanari_config(self, tmp_path, monkeypatch):
@@ -257,7 +256,7 @@ class TestKanariConfigFile:
         with patch("kanari_agent.login.KANARI_CONFIG_PATH", config_file):
             config = load_config()
 
-        assert config.api_key == "sk_from_env"
+        assert config.api_key == "sk_from_env"  # pragma: allowlist secret
 
     def test_missing_kanari_config_returns_empty(self, tmp_path):
         missing = tmp_path / "does_not_exist"
@@ -273,6 +272,6 @@ class TestKanariConfigFile:
             save_kanari_config("sk_abc123", "http://example.com")
             loaded = load_kanari_config()
 
-        assert loaded["api_key"] == "sk_abc123"
+        assert loaded["api_key"] == "sk_abc123"  # pragma: allowlist secret
         assert loaded["api_url"] == "http://example.com"
         assert oct(config_file.stat().st_mode)[-3:] == "600"

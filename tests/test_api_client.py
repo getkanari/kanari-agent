@@ -268,7 +268,7 @@ class TestBuildPayload:
 
 def _make_http_error(code: int, body: bytes = b"") -> urllib.error.HTTPError:
     err = urllib.error.HTTPError(url="", code=code, msg="", hdrs=None, fp=None)  # type: ignore[arg-type]
-    err.read = lambda: body  # type: ignore[method-assign]
+    err.read = lambda size=-1: body  # type: ignore[method-assign, assignment]
     return err
 
 

@@ -67,7 +67,9 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     kanari_cfg = load_kanari_config()
-    api_url = getattr(args, "api_url", None) or kanari_cfg.get("api_url", "https://api.getkanari.com")
+    api_url = getattr(args, "api_url", None) or kanari_cfg.get(
+        "api_url", "https://api.getkanari.com"
+    )
 
     run_alerts_configure(
         api_url=api_url,
@@ -107,8 +109,12 @@ def main() -> None:
     subparsers.required = False  # allow --version without subcommand
 
     # ── login ──────────────────────────────────────────────────────────────────
-    login_p = subparsers.add_parser("login", help="Authenticate and save API key to ~/.kanari/config")
-    login_p.add_argument("--api-url", default=None, help="Backend URL (default: https://api.getkanari.com)")
+    login_p = subparsers.add_parser(
+        "login", help="Authenticate and save API key to ~/.kanari/config"
+    )
+    login_p.add_argument(
+        "--api-url", default=None, help="Backend URL (default: https://api.getkanari.com)"
+    )
     login_p.set_defaults(func=cmd_login)
 
     # ── alerts ─────────────────────────────────────────────────────────────────
@@ -120,7 +126,9 @@ def main() -> None:
     alerts_cfg_p.add_argument("--config", "-c", help="Path to YAML config file")
     alerts_cfg_p.add_argument("--api-url", default=None, help="Backend URL override")
     alerts_cfg_p.add_argument("--slack-webhook", metavar="URL", help="Slack Incoming Webhook URL")
-    alerts_cfg_p.add_argument("--email", metavar="EMAIL", help="Email address for alert notifications")
+    alerts_cfg_p.add_argument(
+        "--email", metavar="EMAIL", help="Email address for alert notifications"
+    )
     alerts_cfg_p.set_defaults(func=cmd_alerts_configure)
 
     # ── audit ──────────────────────────────────────────────────────────────────
