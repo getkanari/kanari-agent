@@ -94,7 +94,7 @@ pip install kanari-agent
 **2. Point to your infrastructure**
 
 ```bash
-export REDIS_URL=redis://your-redis:6379/0
+export REDIS_URL=redis://your-redis:6379
 export CELERY_BROKER_URL=redis://your-redis:6379/0
 ```
 
