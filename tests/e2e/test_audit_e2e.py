@@ -2,12 +2,14 @@
 E2E tests — require a real Redis instance and a live Celery worker.
 
 Run locally:
+    docker run -d -p 6379:6379 redis:7-alpine   # start Redis
     E2E=true poetry run pytest tests/e2e/ -v
 
 Override Redis URL if needed (defaults to localhost:6379):
     E2E=true E2E_REDIS_URL=redis://myhost:6379/0 poetry run pytest tests/e2e/ -v
 
 Skipped in normal unit test runs unless E2E=true is set.
+Tests that need a live Redis skip automatically if the instance is unreachable.
 """
 
 from __future__ import annotations
@@ -31,6 +33,20 @@ pytestmark = pytest.mark.skipif(not _E2E_ENABLED, reason="Set E2E=true to run e2
 
 _E2E_DIR = Path(__file__).parent
 
+_DEAD_REDIS_URL = "redis://127.0.0.1:19999/0"
+
+
+def _redis_reachable(url: str) -> bool:
+    try:
+        import redis
+
+        client = redis.from_url(url, socket_timeout=2, socket_connect_timeout=2)
+        client.ping()
+        client.close()
+        return True
+    except Exception:
+        return False
+
 
 def _kanari(*args: str, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     """Run `python -m kanari_agent <args>` with isolated Redis env vars."""
@@ -38,7 +54,6 @@ def _kanari(*args: str, extra_env: dict | None = None) -> subprocess.CompletedPr
         **os.environ,
         "REDIS_URL": REDIS_URL,
         "CELERY_BROKER_URL": REDIS_URL,
-        # Suppress inherited env vars that could override REDIS_URL
         **(extra_env or {}),
     }
     return subprocess.run(
@@ -53,9 +68,8 @@ def _parse_audit_json(stdout: str) -> dict[str, Any]:
     """
     Extract the audit result from multi-line output.
 
-    audit --json writes structured log lines (from StructuredLogger) followed
-    by the final audit JSON. We scan in reverse for the first line that has
-    a 'system_status' key, which is the canonical audit result object.
+    audit --json writes structured log lines (StructuredLogger) before the
+    final audit JSON. Scan in reverse for the first line with system_status.
     """
     for line in reversed(stdout.strip().splitlines()):
         line = line.strip()
@@ -71,7 +85,17 @@ def _parse_audit_json(stdout: str) -> dict[str, Any]:
 
 
 @pytest.fixture(scope="module")
-def celery_worker():
+def live_redis() -> None:
+    """Skip the entire module if Redis is not reachable at REDIS_URL."""
+    if not _redis_reachable(REDIS_URL):
+        pytest.skip(
+            f"Redis not reachable at {REDIS_URL}. "
+            f"Start it first: docker run -d -p 6379:6379 redis:7-alpine"
+        )
+
+
+@pytest.fixture(scope="module")
+def celery_worker(live_redis: None) -> Any:
     """Start a real Celery worker against the test Redis; tear down after module."""
     proc = subprocess.Popen(
         [
@@ -90,7 +114,6 @@ def celery_worker():
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    # Give the worker time to register with the broker
     time.sleep(4)
     yield proc
     proc.terminate()
@@ -100,15 +123,18 @@ def celery_worker():
         proc.kill()
 
 
+# ── Tests that need Redis + Celery worker ──────────────────────────────────────
+
+
 class TestAuditE2E:
-    def test_audit_exits_zero_when_healthy(self, celery_worker: subprocess.Popen) -> None:
+    def test_audit_exits_zero_when_healthy(self, celery_worker: Any) -> None:
         result = _kanari("audit", "--json")
         assert result.returncode in (0, 1), (
             f"Expected 0 (healthy) or 1 (warnings), got {result.returncode}.\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}"
         )
 
-    def test_audit_json_output_schema(self, celery_worker: subprocess.Popen) -> None:
+    def test_audit_json_output_schema(self, celery_worker: Any) -> None:
         result = _kanari("audit", "--json")
         payload = _parse_audit_json(result.stdout)
         assert "system_status" in payload, f"Missing 'system_status' in: {payload}"
@@ -116,7 +142,7 @@ class TestAuditE2E:
         assert "metrics" in payload, f"Missing 'metrics' in: {payload}"
         assert "exit_code" in payload, f"Missing 'exit_code' in: {payload}"
 
-    def test_audit_detects_workers(self, celery_worker: subprocess.Popen) -> None:
+    def test_audit_detects_workers(self, celery_worker: Any) -> None:
         result = _kanari("audit", "--json")
         payload = _parse_audit_json(result.stdout)
         assert payload["metrics"]["celery_connected"], (
@@ -124,14 +150,13 @@ class TestAuditE2E:
             f"Is the Celery worker fixture running?"
         )
 
+    # ── Tests that only need dead Redis (no fixture required) ──────────────────
+
     def test_audit_exits_two_on_redis_down(self) -> None:
         result = _kanari(
             "audit",
             "--json",
-            extra_env={
-                "REDIS_URL": "redis://127.0.0.1:19999/0",
-                "CELERY_BROKER_URL": "redis://127.0.0.1:19999/0",
-            },
+            extra_env={"REDIS_URL": _DEAD_REDIS_URL, "CELERY_BROKER_URL": _DEAD_REDIS_URL},
         )
         assert result.returncode == 2, (
             f"Expected exit code 2 (critical) when Redis is unreachable, "
@@ -142,10 +167,7 @@ class TestAuditE2E:
         result = _kanari(
             "audit",
             "--json",
-            extra_env={
-                "REDIS_URL": "redis://127.0.0.1:19999/0",
-                "CELERY_BROKER_URL": "redis://127.0.0.1:19999/0",
-            },
+            extra_env={"REDIS_URL": _DEAD_REDIS_URL, "CELERY_BROKER_URL": _DEAD_REDIS_URL},
         )
         payload = _parse_audit_json(result.stdout)
         assert payload["system_status"] == "CRITICAL", (
@@ -154,7 +176,7 @@ class TestAuditE2E:
 
 
 class TestDoctorE2E:
-    def test_doctor_passes_with_real_redis(self, celery_worker: subprocess.Popen) -> None:
+    def test_doctor_passes_with_real_redis(self, celery_worker: Any) -> None:
         result = _kanari("doctor", "--no-color")
         assert result.returncode == 0, (
             f"kanari doctor returned {result.returncode}.\n{result.stdout}"
@@ -166,10 +188,7 @@ class TestDoctorE2E:
         result = _kanari(
             "doctor",
             "--no-color",
-            extra_env={
-                "REDIS_URL": "redis://127.0.0.1:19999/0",
-                "CELERY_BROKER_URL": "redis://127.0.0.1:19999/0",
-            },
+            extra_env={"REDIS_URL": _DEAD_REDIS_URL, "CELERY_BROKER_URL": _DEAD_REDIS_URL},
         )
         assert result.returncode == 1
         assert "Connection failed" in result.stdout
