@@ -23,8 +23,7 @@ jobs:
           --health-retries 5
 
     env:
-      REDIS_URL: redis://localhost:6379/0
-      CELERY_BROKER_URL: redis://localhost:6379/0
+      E2E_REDIS_URL: redis://localhost:6379/0
       E2E: "true"
 
     steps:
@@ -52,7 +51,7 @@ jobs:
         run: poetry install --with dev
 
       - name: Verify Redis is reachable
-        run: redis-cli -u $REDIS_URL ping
+        run: redis-cli -u $E2E_REDIS_URL ping
 
       - name: Run E2E tests
         run: poetry run pytest tests/e2e/ -v --tb=short

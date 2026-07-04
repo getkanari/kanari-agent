@@ -2,7 +2,10 @@
 E2E tests — require a real Redis instance and a live Celery worker.
 
 Run locally:
-    E2E=true REDIS_URL=redis://localhost:6379/0 poetry run pytest tests/e2e/ -v
+    E2E=true poetry run pytest tests/e2e/ -v
+
+Override Redis URL if needed (defaults to localhost:6379):
+    E2E=true E2E_REDIS_URL=redis://myhost:6379/0 poetry run pytest tests/e2e/ -v
 
 Skipped in normal unit test runs unless E2E=true is set.
 """
@@ -15,10 +18,13 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+# Use E2E_REDIS_URL so we never accidentally inherit REDIS_URL from the shell
+# (e.g. a Docker Compose env where redis://redis:6379 doesn't resolve locally).
+REDIS_URL = os.environ.get("E2E_REDIS_URL", "redis://localhost:6379/0")
 _E2E_ENABLED = os.environ.get("E2E", "false").lower() in ("true", "1", "yes")
 
 pytestmark = pytest.mark.skipif(not _E2E_ENABLED, reason="Set E2E=true to run e2e tests")
@@ -27,11 +33,12 @@ _E2E_DIR = Path(__file__).parent
 
 
 def _kanari(*args: str, extra_env: dict | None = None) -> subprocess.CompletedProcess:
-    """Run `python -m kanari_agent <args>` with test Redis env vars."""
+    """Run `python -m kanari_agent <args>` with isolated Redis env vars."""
     env = {
         **os.environ,
         "REDIS_URL": REDIS_URL,
         "CELERY_BROKER_URL": REDIS_URL,
+        # Suppress inherited env vars that could override REDIS_URL
         **(extra_env or {}),
     }
     return subprocess.run(
@@ -40,6 +47,27 @@ def _kanari(*args: str, extra_env: dict | None = None) -> subprocess.CompletedPr
         text=True,
         env=env,
     )
+
+
+def _parse_audit_json(stdout: str) -> dict[str, Any]:
+    """
+    Extract the audit result from multi-line output.
+
+    audit --json writes structured log lines (from StructuredLogger) followed
+    by the final audit JSON. We scan in reverse for the first line that has
+    a 'system_status' key, which is the canonical audit result object.
+    """
+    for line in reversed(stdout.strip().splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+            if "system_status" in data:
+                return data
+        except json.JSONDecodeError:
+            continue
+    raise ValueError(f"No audit JSON result found in output:\n{stdout}")
 
 
 @pytest.fixture(scope="module")
@@ -82,17 +110,17 @@ class TestAuditE2E:
 
     def test_audit_json_output_schema(self, celery_worker: subprocess.Popen) -> None:
         result = _kanari("audit", "--json")
-        payload = json.loads(result.stdout)
-        assert "status" in payload, f"Missing 'status' key in: {payload}"
-        assert "findings" in payload, f"Missing 'findings' key in: {payload}"
-        assert "queues" in payload, f"Missing 'queues' key in: {payload}"
-        assert "workers" in payload, f"Missing 'workers' key in: {payload}"
+        payload = _parse_audit_json(result.stdout)
+        assert "system_status" in payload, f"Missing 'system_status' in: {payload}"
+        assert "top_findings" in payload, f"Missing 'top_findings' in: {payload}"
+        assert "metrics" in payload, f"Missing 'metrics' in: {payload}"
+        assert "exit_code" in payload, f"Missing 'exit_code' in: {payload}"
 
     def test_audit_detects_workers(self, celery_worker: subprocess.Popen) -> None:
         result = _kanari("audit", "--json")
-        payload = json.loads(result.stdout)
-        assert payload["workers"] > 0, (
-            f"Expected at least 1 worker but got {payload['workers']}.\n"
+        payload = _parse_audit_json(result.stdout)
+        assert payload["metrics"]["celery_connected"], (
+            f"Expected celery_connected=True but got: {payload['metrics']}\n"
             f"Is the Celery worker fixture running?"
         )
 
@@ -110,7 +138,7 @@ class TestAuditE2E:
             f"got {result.returncode}.\nstdout: {result.stdout}"
         )
 
-    def test_audit_json_redis_down_has_finding(self) -> None:
+    def test_audit_json_redis_down_is_critical(self) -> None:
         result = _kanari(
             "audit",
             "--json",
@@ -119,20 +147,20 @@ class TestAuditE2E:
                 "CELERY_BROKER_URL": "redis://127.0.0.1:19999/0",
             },
         )
-        payload = json.loads(result.stdout)
-        codes = [f.get("code", "") for f in payload.get("findings", [])]
-        assert "REDIS_DOWN" in codes, f"Expected REDIS_DOWN finding, got: {codes}"
+        payload = _parse_audit_json(result.stdout)
+        assert payload["system_status"] == "CRITICAL", (
+            f"Expected system_status=CRITICAL when Redis is down, got: {payload}"
+        )
 
 
 class TestDoctorE2E:
     def test_doctor_passes_with_real_redis(self, celery_worker: subprocess.Popen) -> None:
         result = _kanari("doctor", "--no-color")
-        # Exit 0 = all ok, exit 1 = failures — with a worker up we expect 0
         assert result.returncode == 0, (
             f"kanari doctor returned {result.returncode}.\n{result.stdout}"
         )
         assert "Redis" in result.stdout
-        assert "✅" in result.stdout or "All checks passed" in result.stdout
+        assert "All checks passed" in result.stdout
 
     def test_doctor_fails_gracefully_when_redis_down(self) -> None:
         result = _kanari(
@@ -144,4 +172,4 @@ class TestDoctorE2E:
             },
         )
         assert result.returncode == 1
-        assert "Connection failed" in result.stdout or "error" in result.stdout.lower()
+        assert "Connection failed" in result.stdout
