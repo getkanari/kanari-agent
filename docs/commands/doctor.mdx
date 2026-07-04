@@ -1,0 +1,151 @@
+---
+title: kanari doctor
+description: Diagnose setup issues before running the agent
+---
+
+## Overview
+
+`kanari doctor` runs a series of connectivity and dependency checks and tells you exactly what's working and what isn't — with a specific fix for each problem.
+
+Run it when:
+- You just installed Kanari and want to verify your setup
+- `kanari audit` fails with a connection error and you're not sure why
+- You want to confirm a config file is valid before deploying
+
+```bash
+kanari doctor
+```
+
+```
+Kanari Doctor — checking your setup
+
+  ✅  Python: 3.12.10
+  ✅  redis library: Installed
+  ✅  celery library: Installed
+  ✅  PyYAML: Installed
+  ℹ️   Config file: Not specified — using env vars and defaults
+  ✅  Redis (redis://localhost:6379/0): Connected
+  ⚠️   Celery workers (redis://localhost:6379/0): Broker reachable but no workers found
+       → celery -A <your_app> worker --loglevel=info
+  ℹ️   API key: Not set — needed only for alerts and API mode
+       → kanari login
+
+  ⚠️   1 warning(s) — kanari will work but some features may be limited
+```
+
+---
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--config`, `-c` | — | Path to a YAML config file to validate |
+| `--no-color` | off | Disable ANSI colors |
+
+---
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All checks passed (or warnings only) |
+| `1` | At least one check failed |
+
+---
+
+## Checks
+
+`kanari doctor` runs 8 checks in order:
+
+| Check | What it verifies |
+|-------|-----------------|
+| **Python** | Version is 3.9 or newer |
+| **redis library** | `redis` package is installed |
+| **celery library** | `celery` package is installed |
+| **PyYAML** | `pyyaml` package is installed (required for `.yaml` config files) |
+| **Config file** | If `--config` is given, the file exists and parses without errors |
+| **Redis** | Can connect and `PING` the Redis instance at `REDIS_URL` |
+| **Celery workers** | Broker is reachable and at least one worker is responding |
+| **API key** | If set, the key format looks valid (`sk_...`) |
+
+All checks always run — doctor doesn't stop on the first failure.
+
+---
+
+## Check statuses
+
+| Icon | Meaning |
+|------|---------|
+| ✅ | Check passed |
+| ⚠️ | Warning — kanari will work but something may be limited |
+| ❌ | Failure — fix this before running `kanari audit` |
+| ℹ️ | Informational — no action required |
+
+---
+
+## Examples
+
+```bash
+# Check default setup (uses env vars and localhost defaults)
+kanari doctor
+
+# Validate a specific config file
+kanari doctor --config config.yaml
+
+# Use in CI to verify infrastructure is reachable before running an audit
+kanari doctor --no-color && kanari audit --json
+```
+
+---
+
+## Common issues
+
+**Redis connection refused**
+
+```
+❌  Redis (redis://localhost:6379/0): Connection failed
+     → Check REDIS_URL — Error 61 connecting to localhost:6379. Connection refused.
+```
+
+Redis isn't running or `REDIS_URL` points to the wrong host. Fix:
+
+```bash
+# Set the correct URL
+export REDIS_URL=redis://your-redis-host:6379/0
+
+# Or start Redis locally
+docker run -d -p 6379:6379 redis:7-alpine
+```
+
+---
+
+**No Celery workers found**
+
+```
+⚠️   Celery workers (redis://localhost:6379/0): Broker reachable but no workers found
+     → celery -A <your_app> worker --loglevel=info
+```
+
+Redis is up but no workers are registered. `kanari audit` will still run — it will report `NO_WORKERS` as a finding. Start a worker to resolve.
+
+---
+
+**PyYAML not installed**
+
+```
+⚠️   PyYAML: Not installed — .yaml config files won't load
+     → pip install pyyaml
+```
+
+If you're using `--config config.yaml`, PyYAML is required. It's included in the standard `pip install kanari-agent` but may be missing in minimal environments.
+
+---
+
+**API key not set**
+
+```
+ℹ️   API key: Not set — needed only for alerts and API mode
+     → kanari login
+```
+
+This is informational, not an error. `kanari audit` and `kanari watch` work without an API key. You only need one if you're running `kanari agent` in API mode for persistent monitoring and alerts.

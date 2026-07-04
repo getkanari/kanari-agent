@@ -98,7 +98,15 @@ export REDIS_URL=redis://your-redis:6379
 export CELERY_BROKER_URL=redis://your-redis:6379/0
 ```
 
-**3. Run a health check**
+**3. Verify your setup**
+
+```bash
+kanari doctor
+```
+
+Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong.
+
+**4. Run a health check**
 
 ```bash
 kanari audit
@@ -109,6 +117,17 @@ That's it. No account, no API key, no external dependencies beyond Redis and Cel
 ---
 
 ## Commands
+
+### `kanari doctor`
+
+Diagnose your setup before running anything else. Checks Python version, required libraries, Redis connectivity, Celery workers, and API key format.
+
+```bash
+kanari doctor                         # check default setup
+kanari doctor --config config.yaml    # also validate a config file
+```
+
+Returns exit code `0` if everything passes (or only warnings), `1` if any check fails.
 
 ### `kanari audit`
 

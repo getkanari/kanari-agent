@@ -49,6 +49,7 @@
     {
       "group": "Commands",
       "pages": [
+        "docs/commands/doctor",
         "docs/commands/login",
         "docs/commands/audit",
         "docs/commands/watch",
