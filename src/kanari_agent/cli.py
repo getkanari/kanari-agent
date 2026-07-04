@@ -79,6 +79,16 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_doctor(args: argparse.Namespace) -> None:
+    from kanari_agent.doctor import run_doctor
+
+    exit_code = run_doctor(
+        config_path=getattr(args, "config", None),
+        no_color=getattr(args, "no_color", False),
+    )
+    sys.exit(exit_code)
+
+
 def cmd_agent(args: argparse.Namespace) -> None:
     from kanari_agent.agent import KanariAgent
     from kanari_agent.config import load_config
@@ -130,6 +140,13 @@ def main() -> None:
         "--email", metavar="EMAIL", help="Email address for alert notifications"
     )
     alerts_cfg_p.set_defaults(func=cmd_alerts_configure)
+
+    # ── doctor ─────────────────────────────────────────────────────────────────
+    doctor_p = subparsers.add_parser(
+        "doctor", help="Diagnose setup issues (connectivity, libraries, config)"
+    )
+    _add_common_args(doctor_p)
+    doctor_p.set_defaults(func=cmd_doctor)
 
     # ── audit ──────────────────────────────────────────────────────────────────
     audit_p = subparsers.add_parser("audit", help="One-shot health check with TUI report")
