@@ -63,6 +63,13 @@ def _get(url: str, timeout: int = 10) -> dict[str, Any]:
         return json.loads(resp.read())  # type: ignore[no-any-return]
 
 
+def _get_authed(url: str, api_key: str, timeout: int = 10) -> dict[str, Any]:
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+        return json.loads(resp.read())  # type: ignore[no-any-return]
+
+
 # ── kanari login ──────────────────────────────────────────────────────────────
 
 
