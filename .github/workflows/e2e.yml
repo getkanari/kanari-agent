@@ -51,7 +51,8 @@ jobs:
         run: poetry install --with dev
 
       - name: Verify Redis is reachable
-        run: redis-cli -u $E2E_REDIS_URL ping
+        run: |
+          poetry run python -c "import redis; r = redis.from_url('$E2E_REDIS_URL'); r.ping(); print('Redis: OK')"
 
       - name: Run E2E tests
         run: poetry run pytest tests/e2e/ -v --tb=short
