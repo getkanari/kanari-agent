@@ -18,7 +18,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/herchila/kanari-agent"
+      "url": "https://github.com/getkanari/kanari-agent"
     }
   ],
   "topbarCtaButton": {
@@ -30,12 +30,12 @@
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/herchila/kanari-agent"
+      "url": "https://github.com/getkanari/kanari-agent"
     },
     {
       "name": "Changelog",
       "icon": "list",
-      "url": "https://github.com/herchila/kanari-agent/blob/master/CHANGELOG.md"
+      "url": "https://github.com/getkanari/kanari-agent/blob/master/CHANGELOG.md"
     }
   ],
   "navigation": [
@@ -75,6 +75,6 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/herchila/kanari-agent"
+    "github": "https://github.com/getkanari/kanari-agent"
   }
 }

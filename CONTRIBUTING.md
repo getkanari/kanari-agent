@@ -14,7 +14,7 @@ Thanks for your interest in contributing! This document will help you get starte
 ### Clone and Install
 
 ```bash
-git clone https://github.com/herchila/kanari-agent.git
+git clone https://github.com/getkanari/kanari-agent.git
 cd kanari-agent
 
 # Install dependencies
@@ -208,7 +208,7 @@ We'll respond within 48 hours.
 ## Getting Help
 
 - 💬 Discord: [discord.gg/kanari](https://discord.gg/kanari)
-- 🐛 Issues: [GitHub Issues](https://github.com/herchila/kanari-agent/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/getkanari/kanari-agent/issues)
 - 📧 Email: support@getkanari.com
 
 --- -->
