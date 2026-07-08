@@ -3,13 +3,25 @@ title: Configuration
 description: Full reference for config file and environment variables
 ---
 
+## Two config files, two purposes
+
+| File | Purpose | Written by | Contains secrets? | Commit to git? |
+|------|---------|-----------|-------------------|----------------|
+| `kanari.yaml` | What to monitor — URLs, thresholds, queues | `kanari init` / you | No | ✅ Yes |
+| `~/.kanari/config` | Who you are — API key and backend URL | `kanari login` | Yes | ❌ Never |
+
+`kanari.yaml` lives next to your project code and is safe to version-control. `~/.kanari/config` lives in your home directory and is `chmod 600` — it holds your API key and should never be committed.
+
+---
+
 ## Priority order
 
 Configuration is loaded in this order (later overrides earlier):
 
 1. Built-in defaults
-2. YAML config file (`--config config.yaml`)
-3. Environment variables
+2. `kanari.yaml` (or any file passed via `--config`)
+3. `~/.kanari/config` (written by `kanari login`)
+4. Environment variables
 
 ---
 
@@ -127,7 +139,7 @@ kanari audit
 ### Auto-discovery with custom thresholds
 
 ```yaml
-# config.yaml — no monitored_queues means auto-discover from workers
+# kanari.yaml — no monitored_queues means auto-discover from workers
 redis_url: redis://prod-redis:6379/1
 celery_broker_url: redis://prod-redis:6379/1
 monitored_queues: []

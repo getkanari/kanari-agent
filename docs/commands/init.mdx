@@ -1,26 +1,26 @@
 ---
 title: kanari init
-description: Generate a starter config.yaml with sensible defaults
+description: Generate a starter kanari.yaml with sensible defaults
 ---
 
 ## Overview
 
-`kanari init` creates a `config.yaml` in the current directory. It's the recommended first step after installing Kanari.
+`kanari init` creates a `kanari.yaml` in the current directory. It's the recommended first step after installing Kanari.
 
 ```bash
 kanari init
 ```
 
 ```
-✅ Created config.yaml
+✅ Created kanari.yaml
    Redis detected at redis://localhost:6379/0
 
    Next steps:
-   kanari doctor --config config.yaml  # verify connectivity first
-   kanari audit  --config config.yaml  # one-shot health check
+   kanari doctor --config kanari.yaml  # verify connectivity first
+   kanari audit  --config kanari.yaml  # one-shot health check
 
    No Kanari account yet? Run the agent in local mode:
-   kanari agent  --local --config config.yaml  # logs metrics to stdout, no API
+   kanari agent  --local --config kanari.yaml  # logs metrics to stdout, no API
 ```
 
 ---
@@ -29,7 +29,7 @@ kanari init
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--output`, `-o` | `config.yaml` | Output file path |
+| `--output`, `-o` | `kanari.yaml` | Output file path |
 | `--force`, `-f` | off | Overwrite if the file already exists |
 
 ---
@@ -42,7 +42,7 @@ If `REDIS_URL` or `CELERY_BROKER_URL` are set in your environment, `kanari init`
 export REDIS_URL=redis://prod-redis:6379/0
 export CELERY_BROKER_URL=redis://prod-redis:6379/1
 kanari init
-# config.yaml will contain the prod URLs, not localhost
+# kanari.yaml will contain the prod URLs, not localhost
 ```
 
 Supported variables:
@@ -61,12 +61,12 @@ Supported variables:
 After writing the file, `kanari init` pings Redis at the configured URL:
 
 ```
-✅ Created config.yaml
+✅ Created kanari.yaml
    Redis detected at redis://localhost:6379/0    ← reachable
 ```
 
 ```
-✅ Created config.yaml
+✅ Created kanari.yaml
    ⚠️  Redis not reachable at redis://localhost:6379/0
       Update redis_url in the config file before running.
 ```
@@ -107,12 +107,12 @@ Edit `redis_url` and `celery_broker_url` to match your infrastructure. All other
 After `kanari init`, the recommended flow is:
 
 ```bash
-kanari doctor --config config.yaml   # verify connectivity and libraries
-kanari audit  --config config.yaml   # run your first health check
+kanari doctor --config kanari.yaml   # verify connectivity and libraries
+kanari audit  --config kanari.yaml   # run your first health check
 ```
 
 No Kanari account yet? Use local mode to run the monitoring daemon without any API calls:
 
 ```bash
-kanari agent --local --config config.yaml
+kanari agent --local --config kanari.yaml
 ```

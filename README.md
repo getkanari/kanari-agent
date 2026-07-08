@@ -97,12 +97,12 @@ pip install kanari
 kanari init
 ```
 
-Creates `config.yaml` with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_URL` are set in your environment, they're picked up automatically. The command also pings Redis and tells you whether it's reachable.
+Creates `kanari.yaml` with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_URL` are set in your environment, they're picked up automatically. The command also pings Redis and tells you whether it's reachable.
 
 **3. Verify your setup**
 
 ```bash
-kanari doctor --config config.yaml
+kanari doctor --config kanari.yaml
 ```
 
 Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong.
@@ -110,7 +110,7 @@ Checks that Redis is reachable, Celery workers are responding, and all required 
 **4. Run a health check**
 
 ```bash
-kanari audit --config config.yaml
+kanari audit --config kanari.yaml
 ```
 
 That's it. No account, no API key, no external dependencies beyond Redis and Celery.
@@ -123,11 +123,11 @@ That's it. No account, no API key, no external dependencies beyond Redis and Cel
 
 ### `kanari init`
 
-Generate a starter `config.yaml` with sensible defaults. Reads `REDIS_URL` and `CELERY_BROKER_URL` from the environment if set, and probes Redis to confirm connectivity.
+Generate a starter `kanari.yaml` with sensible defaults. Reads `REDIS_URL` and `CELERY_BROKER_URL` from the environment if set, and probes Redis to confirm connectivity.
 
 ```bash
-kanari init                        # creates config.yaml in the current directory
-kanari init --output /etc/kanari/config.yaml  # custom path
+kanari init                        # creates kanari.yaml in the current directory
+kanari init --output /etc/kanari/kanari.yaml  # custom path
 kanari init --force                # overwrite existing file
 ```
 
@@ -137,7 +137,7 @@ Diagnose your setup before running anything else. Checks Python version, require
 
 ```bash
 kanari doctor                         # check default setup
-kanari doctor --config config.yaml    # also validate a config file
+kanari doctor --config kanari.yaml    # also validate a config file
 ```
 
 Returns exit code `0` if everything passes (or only warnings), `1` if any check fails.
@@ -151,7 +151,7 @@ kanari audit                        # rich TUI report + Redis/Celery config anal
 kanari audit --json                 # machine-readable JSON (for CI/scripts)
 kanari audit --md                   # Markdown report
 kanari audit --no-config-checks    # skip config analysis (e.g. restricted Redis)
-kanari audit --config config.yaml   # use config file
+kanari audit --config kanari.yaml   # use config file
 ```
 
 Configuration analysis (acks_late, eviction policy, prefetch, and more) runs on every audit. On a healthy system the report shows a `✓ N checks passed` summary of everything verified. The JSON output includes a `checks_performed` array for CI assertions.
@@ -188,7 +188,7 @@ Continuous monitoring loop. Runs until stopped. In local mode it logs structured
 
 ```bash
 kanari agent --local                        # log only, no API calls
-kanari agent --config config.yaml --local   # with config file
+kanari agent --config kanari.yaml --local   # with config file
 kanari agent --token your-api-key           # sends metrics to api.getkanari.com
 ```
 
@@ -216,7 +216,12 @@ After this, `kanari audit` shows real wait times per queue and triggers `QUEUE_S
 
 ## Configuration
 
-All settings can be set via environment variables. A config file is optional.
+Kanari uses two separate config files with different purposes:
+
+| File | Purpose | Written by | Contains secrets? | Commit to git? |
+|------|---------|-----------|-------------------|----------------|
+| `kanari.yaml` | What to monitor (URLs, thresholds, queues) | `kanari init` / you | No | ✅ Yes |
+| `~/.kanari/config` | Who you are (API key) | `kanari login` | Yes | ❌ Never |
 
 ### Environment variables
 
@@ -256,7 +261,7 @@ privacy:
 ```
 
 ```bash
-kanari audit --config config.yaml
+kanari audit --config kanari.yaml
 ```
 
 ---

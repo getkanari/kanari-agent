@@ -90,7 +90,7 @@ All checks always run — doctor doesn't stop on the first failure.
 kanari doctor
 
 # Validate a specific config file
-kanari doctor --config config.yaml
+kanari doctor --config kanari.yaml
 
 # Use in CI to verify infrastructure is reachable before running an audit
 kanari doctor --no-color && kanari audit --json
@@ -137,7 +137,7 @@ Redis is up but no workers are registered. `kanari audit` will still run — it 
      → pip install pyyaml
 ```
 
-If you're using `--config config.yaml`, PyYAML is required. It's included in the standard `pip install kanari-agent` but may be missing in minimal environments.
+If you're using `--config kanari.yaml`, PyYAML is required. It's included in the standard `pip install kanari-agent` but may be missing in minimal environments.
 
 ---
 
