@@ -2,7 +2,7 @@
 E2E tests — require a real Redis instance and a live Celery worker.
 
 Run locally:
-    docker run -d -p 6379:6379 redis:7-alpine   # start Redis
+    docker run -d --name kanari-e2e-redis --rm -p 6379:6379 redis:7-alpine   # start Redis
     E2E=true poetry run pytest tests/e2e/ -v
 
 Override Redis URL if needed (defaults to localhost:6379):
@@ -90,7 +90,7 @@ def live_redis() -> None:
     if not _redis_reachable(REDIS_URL):
         pytest.skip(
             f"Redis not reachable at {REDIS_URL}. "
-            f"Start it first: docker run -d -p 6379:6379 redis:7-alpine"
+            f"Start it first: docker run -d --name kanari-e2e-redis --rm -p 6379:6379 redis:7-alpine"
         )
 
 
