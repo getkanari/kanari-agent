@@ -137,6 +137,31 @@ class TestCliAudit:
                 _run_main(["audit"])
         assert exc.value.code == 2
 
+    def test_audit_without_config_prints_defaults_hint(self, capsys):
+        cfg = Config()
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit"])
+        out = capsys.readouterr().out
+        assert "localhost" in out
+        assert "kanari init" in out
+
+    def test_audit_with_config_skips_defaults_hint(self, tmp_path: Path, capsys):
+        cfg = Config()
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("redis_url: redis://localhost:6379/0\n")
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "kanari init" not in out
+
 
 # ---------------------------------------------------------------------------
 # kanari watch

@@ -100,6 +100,11 @@ def cmd_audit(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
 
+    if not args.config:
+        print("💡 No --config specified — connecting to localhost defaults.")
+        print("   Run 'kanari init' to generate a config.yaml.")
+        print()
+
     config = load_config(args.config)
     exit_code = run_audit(
         config=config,
