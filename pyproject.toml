@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kanari-agent"
-version = "0.2.0b1"
+version = "0.2.0"
 description = "Privacy-first monitoring agent for Celery + Redis"
 authors = ["Hernán Chilabert <hchilabert@gmail.com>"]
 readme = "README.md"

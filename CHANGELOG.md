@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-07-08
 
 ### Added
 - **Configuration analysis now runs on every `kanari audit`** — no flag needed. Config smells like `task_acks_late=False`, `noeviction`, missing `maxmemory`, and high prefetch surface on your very first run
