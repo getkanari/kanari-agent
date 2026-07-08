@@ -129,6 +129,14 @@ def _check_config_file(path: Optional[str]) -> CheckResult:
         from kanari_agent.config import load_config
 
         load_config(path)
+        overrides = [v for v in ("REDIS_URL", "CELERY_BROKER_URL") if os.environ.get(v)]
+        if overrides:
+            return CheckResult(
+                label,
+                Status.OK,
+                f"Loaded: {path}",
+                fix=f"Note: {', '.join(overrides)} env var(s) override values in this file",
+            )
         return CheckResult(label, Status.OK, f"Loaded: {path}")
     except Exception as exc:
         return CheckResult(
