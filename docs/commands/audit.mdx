@@ -95,13 +95,23 @@ kanari audit --md
 
 ---
 
+## Without a config file
+
+`--config` is optional. When omitted, Kanari connects to `redis://localhost:6379/0` and auto-discovers queues from live workers:
+
+```bash
+kanari audit
+# 💡 No --config specified — connecting to localhost defaults.
+#    Run 'kanari init' to generate a config.yaml.
+```
+
 ## With a config file
 
 ```bash
 kanari audit --config config.yaml
 ```
 
-The config file lets you set custom thresholds, specify which queues to monitor, and configure privacy settings. See [Configuration](/reference/configuration) for the full reference.
+The config file lets you set custom thresholds, specify which queues to monitor, and configure privacy settings. Run `kanari init` to generate one, or see [Configuration](/reference/configuration) for the full reference.
 
 ---
 

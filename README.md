@@ -91,17 +91,18 @@ Audit completed in 1.3s
 pip install kanari
 ```
 
-**2. Point to your infrastructure**
+**2. Generate a config file**
 
 ```bash
-export REDIS_URL=redis://your-redis:6379
-export CELERY_BROKER_URL=redis://your-redis:6379/0
+kanari init
 ```
+
+Creates `config.yaml` with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_URL` are set in your environment, they're picked up automatically. The command also pings Redis and tells you whether it's reachable.
 
 **3. Verify your setup**
 
 ```bash
-kanari doctor
+kanari doctor --config config.yaml
 ```
 
 Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong.
@@ -109,14 +110,26 @@ Checks that Redis is reachable, Celery workers are responding, and all required 
 **4. Run a health check**
 
 ```bash
-kanari audit
+kanari audit --config config.yaml
 ```
 
 That's it. No account, no API key, no external dependencies beyond Redis and Celery.
 
+> **Tip:** `kanari audit` also works without a config file — it connects to `redis://localhost:6379/0` by default.
+
 ---
 
 ## Commands
+
+### `kanari init`
+
+Generate a starter `config.yaml` with sensible defaults. Reads `REDIS_URL` and `CELERY_BROKER_URL` from the environment if set, and probes Redis to confirm connectivity.
+
+```bash
+kanari init                        # creates config.yaml in the current directory
+kanari init --output /etc/kanari/config.yaml  # custom path
+kanari init --force                # overwrite existing file
+```
 
 ### `kanari doctor`
 
