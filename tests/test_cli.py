@@ -287,7 +287,7 @@ class TestCmdInit:
         monkeypatch.chdir(tmp_path)
         with patch("kanari_agent.cli._probe_redis", return_value=False):
             _run_main(["init"])
-        assert (tmp_path / "config.yaml").exists()
+        assert (tmp_path / "kanari.yaml").exists()
 
     def test_uses_redis_url_env_var(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("REDIS_URL", "redis://myhost:6379/2")

@@ -77,7 +77,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
                     privacy_data["sanitize_task_signatures"] = p["sanitize_task_signatures"]
                 config_data["privacy"] = PrivacyConfig(**privacy_data)
 
-    # ~/.kanari/config (written by kanari login) overrides config.yaml
+    # ~/.kanari/config (written by kanari login) overrides kanari.yaml
     from kanari_agent.login import load_kanari_config
 
     kanari_cfg = load_kanari_config()

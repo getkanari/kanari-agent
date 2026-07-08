@@ -14,14 +14,14 @@ def _print_welcome() -> None:
     print(f"Kanari — on-call monitoring for Celery + Redis  v{AGENT_VERSION}")
     print()
     print("  Quick start (no account needed):")
-    print("    kanari init                         # generate config.yaml")
-    print("    kanari doctor --config config.yaml  # verify connectivity")
-    print("    kanari audit  --config config.yaml  # one-shot health check")
-    print("    kanari watch  --config config.yaml  # live dashboard")
+    print("    kanari init                         # generate kanari.yaml")
+    print("    kanari doctor --config kanari.yaml  # verify connectivity")
+    print("    kanari audit  --config kanari.yaml  # one-shot health check")
+    print("    kanari watch  --config kanari.yaml  # live dashboard")
     print()
     print("  With an account (automatic alerts):")
     print("    kanari login                        # authenticate")
-    print("    kanari agent  --config config.yaml  # start monitoring daemon")
+    print("    kanari agent  --config kanari.yaml  # start monitoring daemon")
     print()
     print("  Tips:")
     print("    No config?   kanari audit connects to localhost defaults.")
@@ -53,7 +53,7 @@ def _probe_redis(url: str) -> bool:
 def cmd_init(args: argparse.Namespace) -> None:
     import os
 
-    output = getattr(args, "output", "config.yaml")
+    output = getattr(args, "output", "kanari.yaml")
     force = getattr(args, "force", False)
 
     if os.path.exists(output) and not force:
@@ -138,7 +138,7 @@ def cmd_audit(args: argparse.Namespace) -> None:
 
     if not args.config:
         print("💡 No --config specified — connecting to localhost defaults.")
-        print("   Run 'kanari init' to generate a config.yaml.")
+        print("   Run 'kanari init' to generate a kanari.yaml.")
         print()
 
     config = load_config(args.config)
@@ -180,7 +180,7 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
     from kanari_agent.config import load_config
     from kanari_agent.login import load_kanari_config, run_alerts_configure
 
-    # Resolve API key: flag > env var > ~/.kanari/config > config.yaml
+    # Resolve API key: flag > env var > ~/.kanari/config > kanari.yaml
     config = load_config(getattr(args, "config", None))
     api_key = config.api_key
     if not api_key:
@@ -353,14 +353,14 @@ def main() -> None:
 
     # ── init ───────────────────────────────────────────────────────────────────
     init_p = subparsers.add_parser(
-        "init", help="Create a starter config.yaml with sensible defaults"
+        "init", help="Create a starter kanari.yaml with sensible defaults"
     )
     init_p.add_argument(
         "--output",
         "-o",
-        default="config.yaml",
+        default="kanari.yaml",
         metavar="FILE",
-        help="Output file path (default: config.yaml)",
+        help="Output file path (default: kanari.yaml)",
     )
     init_p.add_argument(
         "--force",
