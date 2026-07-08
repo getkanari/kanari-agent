@@ -175,6 +175,52 @@ class TestAuditE2E:
         )
 
 
+class TestConfigChecksE2E:
+    """Default-on config analysis — the first-run "aha" guarantee."""
+
+    def test_audit_default_includes_checks_performed(self, celery_worker: Any) -> None:
+        result = _kanari("audit", "--json")
+        payload = _parse_audit_json(result.stdout)
+        checks = payload.get("checks_performed", [])
+        assert checks, f"Expected non-empty checks_performed, got: {payload}"
+        names = [c["name"] for c in checks]
+        assert "redis connectivity" in names
+
+    def test_audit_default_detects_config_smells(self, celery_worker: Any) -> None:
+        """Stock docker Redis has maxmemory=0 — a smell must surface with zero flags."""
+        result = _kanari("audit", "--json")
+        payload = _parse_audit_json(result.stdout)
+        checks = {c["name"]: c["status"] for c in payload.get("checks_performed", [])}
+        assert checks.get("Redis maxmemory") == "warning", (
+            f"Expected 'Redis maxmemory' warning on stock Redis, got: {checks}"
+        )
+        # Stock Celery defaults task_acks_late=False; entry present iff inspector.conf() answered
+        if "Celery task_acks_late" in checks:
+            assert checks["Celery task_acks_late"] == "warning"
+
+    def test_audit_no_config_checks_flag(self, celery_worker: Any) -> None:
+        result = _kanari("audit", "--json", "--no-config-checks")
+        payload = _parse_audit_json(result.stdout)
+        names = [c["name"] for c in payload.get("checks_performed", [])]
+        assert "Redis maxmemory" not in names
+        assert "redis connectivity" in names  # findings families always reported
+
+    def test_config_warnings_do_not_change_exit_code(self, celery_worker: Any) -> None:
+        with_checks = _kanari("audit", "--json")
+        without_checks = _kanari("audit", "--json", "--no-config-checks")
+        assert with_checks.returncode == without_checks.returncode, (
+            f"Config checks changed the exit code: {with_checks.returncode} vs "
+            f"{without_checks.returncode}"
+        )
+
+    def test_deep_flag_still_accepted_with_deprecation_notice(self, celery_worker: Any) -> None:
+        result = _kanari("audit", "--json", "--deep")
+        assert result.returncode in (0, 1)
+        assert "deprecated" in result.stderr
+        # stdout stays parseable despite the stderr notice
+        _parse_audit_json(result.stdout)
+
+
 class TestDoctorE2E:
     def test_doctor_passes_with_real_redis(self, celery_worker: Any) -> None:
         result = _kanari("doctor", "--no-color")

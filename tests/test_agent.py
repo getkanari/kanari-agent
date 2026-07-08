@@ -274,3 +274,91 @@ class TestRun:
         assert call_count == 2
         error_calls = [str(c) for c in agent.logger.error.call_args_list]
         assert any("Error in check cycle" in c for c in error_calls)
+
+
+# ---------------------------------------------------------------------------
+# startup_audit
+# ---------------------------------------------------------------------------
+
+
+class TestStartupAudit:
+    def _make_agent(self, config, metrics=None):
+        agent = KanariAgent(config)
+        agent.collector.connect = MagicMock(return_value=True)
+        agent.collector.get_queues_to_monitor = MagicMock(return_value=["celery"])
+        if metrics is not None:
+            agent.collector.collect = MagicMock(return_value=metrics)
+            agent.collector.latency_available = False
+            agent.collector.redis_client = None
+            agent.collector.celery_app = None
+        return agent
+
+    def test_run_performs_startup_audit_once_before_first_cycle(
+        self, local_config, minimal_metrics
+    ):
+        agent = self._make_agent(local_config)
+        call_order = []
+
+        def record_audit(*args, **kwargs):
+            call_order.append("startup_audit")
+
+        def stop_after_first(*args, **kwargs):
+            call_order.append("check_once")
+            agent.running = False
+            return minimal_metrics
+
+        agent.startup_audit = MagicMock(side_effect=record_audit)
+        agent.check_once = MagicMock(side_effect=stop_after_first)
+
+        with patch("time.sleep"):
+            agent.run()
+
+        agent.startup_audit.assert_called_once()
+        assert call_order[0] == "startup_audit"
+
+    def test_startup_audit_logs_structured_event(self, local_config, minimal_metrics):
+        agent = self._make_agent(local_config, metrics=minimal_metrics)
+        agent.logger.info = MagicMock()
+
+        agent.startup_audit()
+
+        startup_calls = [
+            c for c in agent.logger.info.call_args_list if c[0] and c[0][0] == "startup_audit"
+        ]
+        assert len(startup_calls) == 1
+        kwargs = startup_calls[0][1]
+        assert "system_status" in kwargs
+        assert "findings" in kwargs
+        assert "config_checks" in kwargs
+        assert "checks_passed" in kwargs
+
+    def test_startup_audit_warns_per_finding_and_smell(self, local_config):
+        degraded = SystemMetrics(
+            timestamp="2026-01-01T00:00:00+00:00",
+            redis_connected=True,
+            celery_connected=False,  # NO_WORKERS finding
+        )
+        agent = self._make_agent(local_config, metrics=degraded)
+        agent.logger.warning = MagicMock()
+
+        agent.startup_audit()
+
+        warning_msgs = [str(c[0][0]) for c in agent.logger.warning.call_args_list]
+        assert any("[CRITICAL]" in msg for msg in warning_msgs)
+
+    def test_startup_audit_failure_does_not_crash(self, local_config):
+        agent = self._make_agent(local_config)
+        agent.collector.collect = MagicMock(side_effect=RuntimeError("redis exploded"))
+        agent.logger.error = MagicMock()
+
+        agent.startup_audit()  # must not raise
+
+        assert any("startup_audit_failed" in str(c) for c in agent.logger.error.call_args_list)
+
+    def test_startup_audit_never_sends_to_api(self, api_config, minimal_metrics):
+        agent = self._make_agent(api_config, metrics=minimal_metrics)
+        agent.api_client.send_metrics = MagicMock()
+
+        agent.startup_audit()
+
+        agent.api_client.send_metrics.assert_not_called()

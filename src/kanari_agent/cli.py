@@ -20,14 +20,20 @@ def cmd_audit(args: argparse.Namespace) -> None:
     from kanari_agent.audit import run_audit
     from kanari_agent.config import load_config
 
+    if getattr(args, "deep", False):
+        print(
+            "--deep is deprecated: configuration analysis now runs by default",
+            file=sys.stderr,
+        )
+
     config = load_config(args.config)
     exit_code = run_audit(
         config=config,
         json_output=getattr(args, "json", False),
         md_output=getattr(args, "md", False),
         no_color=getattr(args, "no_color", False),
-        deep=getattr(args, "deep", False),
         timeout=getattr(args, "timeout", 3),
+        config_checks=not getattr(args, "no_config_checks", False),
     )
     sys.exit(exit_code)
 
@@ -297,7 +303,12 @@ def main() -> None:
         "--deep",
         "-d",
         action="store_true",
-        help="Deep configuration analysis (Redis/Celery settings)",
+        help="(deprecated, no-op) Configuration analysis now runs by default",
+    )
+    audit_p.add_argument(
+        "--no-config-checks",
+        action="store_true",
+        help="Skip Redis/Celery configuration analysis (e.g. restricted Redis)",
     )
     audit_p.add_argument(
         "--timeout",

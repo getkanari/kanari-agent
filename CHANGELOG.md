@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+- **Configuration analysis now runs on every `kanari audit`** — no flag needed. Config smells like `task_acks_late=False`, `noeviction`, missing `maxmemory`, and high prefetch surface on your very first run
+- **"Checks passed" summary** — a healthy audit now shows what was verified (`✓ N checks passed: redis connectivity, worker heartbeat, ...`) instead of staying silent
+- **Startup audit in `kanari agent`** — the daemon logs a full assessment (findings + config smells) the moment it boots, in both local and API mode, before entering its monitoring loop
+- **`checks_performed` field in `kanari audit --json`** — machine-readable list of every check that ran and its status, for CI assertions
+- **`--no-config-checks` flag** — skip configuration analysis (e.g. restricted Redis where `CONFIG GET` is disabled)
+
+### Deprecated
+- **`kanari audit --deep`** — now a no-op since config analysis runs by default; the flag is still accepted so existing scripts don't break (a notice is printed to stderr)
+
 ---
 
 ## [0.2.0b1] — 2026-07-01

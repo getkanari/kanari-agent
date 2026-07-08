@@ -11,10 +11,12 @@ from unittest.mock import MagicMock
 from kanari_agent.audit import _status_to_exit_code
 from kanari_agent.collector import _redact_url
 from kanari_agent.findings import (
+    CHECK_FAMILIES,
     Finding,
     FindingsEngine,
     Severity,
     SystemStatus,
+    checks_performed,
     compute_system_status,
     top_findings,
 )
@@ -110,6 +112,66 @@ class TestTopFindings:
 
     def test_empty_returns_empty(self):
         assert top_findings([], 3) == []
+
+
+# ---------------------------------------------------------------------------
+# checks_performed
+# ---------------------------------------------------------------------------
+
+
+class TestChecksPerformed:
+    def test_no_findings_all_families_ok(self):
+        result = checks_performed([])
+        assert len(result) == len(CHECK_FAMILIES)
+        assert all(entry["status"] == "ok" for entry in result)
+
+    def test_family_names_match_registry(self):
+        names = [entry["name"] for entry in checks_performed([])]
+        assert names == [name for name, _ in CHECK_FAMILIES]
+
+    def test_dynamic_queue_backlog_id_marks_family_failed(self):
+        findings = [
+            Finding(
+                id="QUEUE_BACKLOG_EMAILS", severity=Severity.HIGH, title="", impact="", evidence={}
+            )
+        ]
+        result = {entry["name"]: entry["status"] for entry in checks_performed(findings)}
+        assert result["queue backlog"] == "failed"
+        assert result["queue SLA latency"] == "ok"
+        assert result["redis connectivity"] == "ok"
+
+    def test_dynamic_sla_breach_id_marks_family_failed(self):
+        findings = [
+            Finding(
+                id="QUEUE_SLA_BREACH_PAYMENTS",
+                severity=Severity.HIGH,
+                title="",
+                impact="",
+                evidence={},
+            )
+        ]
+        result = {entry["name"]: entry["status"] for entry in checks_performed(findings)}
+        assert result["queue SLA latency"] == "failed"
+        assert result["queue backlog"] == "ok"
+
+    def test_exact_id_marks_family_failed(self):
+        findings = [
+            Finding(id="REDIS_DOWN", severity=Severity.CRITICAL, title="", impact="", evidence={})
+        ]
+        result = {entry["name"]: entry["status"] for entry in checks_performed(findings)}
+        assert result["redis connectivity"] == "failed"
+
+    def test_multiple_findings_multiple_failures(self):
+        findings = [
+            Finding(id="NO_WORKERS", severity=Severity.CRITICAL, title="", impact="", evidence={}),
+            Finding(
+                id="HIGH_SATURATION", severity=Severity.MEDIUM, title="", impact="", evidence={}
+            ),
+        ]
+        statuses = {entry["name"]: entry["status"] for entry in checks_performed(findings)}
+        assert statuses["worker availability"] == "failed"
+        assert statuses["worker saturation"] == "failed"
+        assert sum(1 for s in statuses.values() if s == "failed") == 2
 
 
 # ---------------------------------------------------------------------------
@@ -493,3 +555,25 @@ class TestAuditJsonOutput:
         assert data["system_status"] == "OK"
         assert data["exit_code"] == 0
         assert data["top_findings"] == []
+
+    def test_json_output_includes_checks_performed(self, capsys):
+        from kanari_agent.audit import _print_json_output
+        from kanari_agent.findings import SystemStatus
+
+        checks = [
+            {"name": "redis connectivity", "status": "ok"},
+            {"name": "Celery task_acks_late", "status": "warning"},
+        ]
+        _print_json_output(_metrics(), [], SystemStatus.OK, 0, checks)
+
+        data = json.loads(capsys.readouterr().out)
+        assert data["checks_performed"] == checks
+
+    def test_json_output_checks_performed_defaults_to_empty_list(self, capsys):
+        from kanari_agent.audit import _print_json_output
+        from kanari_agent.findings import SystemStatus
+
+        _print_json_output(_metrics(), [], SystemStatus.OK, 0)
+
+        data = json.loads(capsys.readouterr().out)
+        assert data["checks_performed"] == []

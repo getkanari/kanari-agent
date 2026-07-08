@@ -5,7 +5,7 @@ description: Privacy-first monitoring agent for Celery + Redis queues
 
 ## What is Kanari?
 
-Kanari is a monitoring agent built specifically for Celery + Redis. It detects the problems that generic monitoring tools miss — ghost workers, queue latency, stuck tasks, and silent task loss — and tells you exactly what's wrong and how to fix it.
+Kanari is a monitoring agent built specifically for Celery + Redis. It detects the problems that generic monitoring tools miss, ghost workers, queue latency, stuck tasks, and silent task loss, and tells you exactly what's wrong and how to fix it.
 
 ```bash
 pip install kanari-agent
@@ -33,7 +33,7 @@ Datadog sees healthy CPU. Kanari sees the actual problem.
 
 ## How it works
 
-Kanari connects directly to your Redis and Celery instances — the same way your workers do — and collects:
+Kanari connects directly to your Redis and Celery instances, the same way your workers do, and collects:
 
 - **Queue depth** per queue (via Redis `LLEN`)
 - **Queue latency** — age of the oldest waiting task (requires [KanariStampPlugin](/docs/guides/latency-tracking))

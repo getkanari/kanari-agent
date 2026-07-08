@@ -68,6 +68,32 @@ def top_findings(findings: list[Finding], n: int = 3) -> list[Finding]:
     return sorted(findings, key=lambda f: SEVERITY_RANK[f.severity], reverse=True)[:n]
 
 
+# Every check family FindingsEngine.analyze() evaluates, paired with the
+# finding-id prefix it emits. Drives the "what we checked" summary so a healthy
+# run can prove its depth of analysis instead of staying silent.
+CHECK_FAMILIES: list[tuple[str, str]] = [
+    ("redis connectivity", "REDIS_DOWN"),
+    ("worker availability", "NO_WORKERS"),
+    ("worker heartbeat", "WORKER_OFFLINE"),
+    ("stuck tasks", "STUCK_TASK"),
+    ("queue backlog", "QUEUE_BACKLOG_"),
+    ("queue SLA latency", "QUEUE_SLA_BREACH_"),
+    ("latency instrumentation", "LATENCY_UNAVAILABLE"),
+    ("worker saturation", "HIGH_SATURATION"),
+]
+
+
+def checks_performed(findings: list[Finding]) -> list[dict[str, str]]:
+    """One entry per check family: status "ok" unless a finding id matches its prefix."""
+    return [
+        {
+            "name": name,
+            "status": "failed" if any(f.id.startswith(prefix) for f in findings) else "ok",
+        }
+        for name, prefix in CHECK_FAMILIES
+    ]
+
+
 class FindingsEngine:
     """Analyzes SystemMetrics and produces a list of Finding objects."""
 
