@@ -24,6 +24,8 @@ Configuration is loaded in this order (later overrides earlier):
 | `KANARI_LOCAL_MODE` | Set `true` to disable all API calls | `false` |
 | `CHECK_INTERVAL` | Seconds between collection cycles (agent mode) | `30` |
 | `KANARI_SANITIZE_TASK_SIGNATURES` | Set `false` to disable task name sanitization | `true` |
+| `WORKER_OFFLINE_GRACE_SECONDS` | Seconds a worker-count drop must persist before raising `WORKERS_MISSING` | `90` |
+| `WORKER_AUTO_RESOLVE_SECONDS` | Seconds after which the baseline resets automatically (`null` = alert indefinitely) | `null` |
 
 ---
 
@@ -76,6 +78,19 @@ thresholds:
   critical_queues:
     - emails
     - payments
+
+  # Worker-offline detection (daemon only — `kanari run`).
+  # Tracks a high-water baseline of alive workers. A sustained drop past the
+  # grace period raises WORKERS_MISSING (CRITICAL). The backend maps this to
+  # a pager alert when missing_workers > 0.
+  #
+  # Grace period: how long the count must stay low before alerting.
+  worker_offline_grace_seconds: 90   # default: 90 s
+
+  # Auto-resolve window: re-baseline after this many seconds of reduced count.
+  # null (default) = fail loud — the alert persists until workers come back.
+  # Set to e.g. 1800 for environments where intentional scale-down is common.
+  worker_auto_resolve_seconds: null  # default: null (fail loud)
 
 # ── Privacy ────────────────────────────────────────────────
 

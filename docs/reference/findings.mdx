@@ -82,6 +82,48 @@ echo $CELERY_BROKER_URL
 
 ---
 
+## WORKERS_MISSING
+
+<Info>Severity: **CRITICAL**</Info>
+
+The number of alive workers has dropped below the observed peak (baseline) and the deficit has persisted longer than `worker_offline_grace_seconds` (default: 90 s). The agent reports `missing_workers` in the payload, and the backend turns any `missing_workers > 0` into a CRITICAL alert.
+
+**How it works:** the long-running agent (`kanari run`) tracks a high-water mark of the alive worker count. When the current count falls below that baseline for longer than the grace period, a `WORKERS_MISSING` finding is raised. Detection is count-based, not name-based — see [Known limitations](#known-limitations-worker-offline-detection) below.
+
+**Payload fields:**
+- `expected_workers` — the high-water baseline count
+- `missing_workers` — how many workers are currently absent
+
+**Probable causes:**
+- One or more worker processes crashed (OOM, unhandled exception)
+- Workers were stopped for a deployment but not yet restarted
+- Network partition between workers and the broker
+
+**Confirm:**
+```bash
+celery -A your_app inspect ping
+celery -A your_app inspect active_queues
+```
+
+**Fix:**
+```bash
+# Check for OOM kill
+dmesg | grep -i "killed process"
+journalctl -u celery --since "1 hour ago" | grep -i "error\|killed"
+
+# Restart workers
+celery -A your_app worker --loglevel=info
+```
+
+**Config knobs:**
+```yaml
+thresholds:
+  worker_offline_grace_seconds: 90   # how long a drop must persist before alerting
+  worker_auto_resolve_seconds: null  # null = alert until workers return; set e.g. 1800 to auto-resolve
+```
+
+---
+
 ## WORKER_OFFLINE
 
 <Info>Severity: **CRITICAL**</Info>
@@ -250,3 +292,26 @@ celery -A your_app worker --concurrency=8 &
 # In celery config:
 worker_prefetch_multiplier = 1
 ```
+
+---
+
+## Known limitations — worker-offline detection
+
+Worker-offline detection is count-based and lives in the agent's memory. Known gaps:
+
+- **Baseline resets on agent restart.** The high-water mark is in-memory. After a
+  restart the baseline starts from the currently-alive workers, so a worker that
+  died while the agent was down is not detected until the fleet is seen complete
+  again. Persisting to disk is a deliberate non-goal — it does not resolve the
+  crash-vs-scaledown ambiguity during downtime.
+- **Count-based, not name-based.** We alert on *how many* workers are missing, not
+  *which* one. This is intentional: it stays robust when worker names are ephemeral
+  (Kubernetes, autoscaling), where name-tracking would produce constant churn.
+- **Crash vs. intentional scale-down is indistinguishable** without an external
+  signal. Default is fail-loud (keep alerting); set `worker_auto_resolve_seconds`
+  to re-baseline automatically after a window.
+- **One-shot `kanari audit` cannot detect missing workers.** It has no cross-cycle
+  history, so its baseline equals the current alive count. Only the long-running
+  agent (`kanari run`) accumulates a baseline.
+
+Feedback and discussion welcome — these tradeoffs are deliberately conservative.

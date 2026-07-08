@@ -52,6 +52,12 @@ thresholds:
   max_wait_time_seconds: 60
   max_task_runtime_seconds: 1800  # 30 minutes
 
+  # Worker-offline detection: a sustained drop below the observed peak worker
+  # count (baseline) is reported as missing capacity once it outlives the grace
+  # period. The backend turns missing_workers > 0 into a CRITICAL alert.
+  worker_offline_grace_seconds: 90   # how long a gap must persist before alerting
+  worker_auto_resolve_seconds: null  # null = fail loud; set (e.g. 1800) to auto-resolve
+
   # Enable task latency tracking
   task_send_sent_event: False
 
