@@ -13,6 +13,7 @@ from typing import Any
 from kanari_agent.logger import StructuredLogger
 from kanari_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
 from kanari_agent.stamps import KANARI_TS_HEADER
+from kanari_agent.worker_baseline import WorkerBaseline
 
 # Optional dependencies - check at runtime
 try:
@@ -49,6 +50,10 @@ class MetricsCollector:
         self.redis_client: Any | None = None
         self.celery_app: Any | None = None
         self._discovered_queues: list[str] = []
+        self._worker_baseline = WorkerBaseline(
+            grace_seconds=config.thresholds.worker_offline_grace_seconds,
+            auto_resolve_seconds=config.thresholds.worker_auto_resolve_seconds,
+        )
         self.latency_available: bool = False
 
     def connect(self) -> bool:
@@ -375,5 +380,11 @@ class MetricsCollector:
             metrics.saturation_pct = (metrics.total_active_tasks / total_concurrency) * 100
         else:
             metrics.saturation_pct = 0.0
+
+        expected, missing = self._worker_baseline.update(
+            metrics.alive_workers, datetime.now(timezone.utc)
+        )
+        metrics.expected_workers = expected
+        metrics.missing_workers = missing
 
         return metrics

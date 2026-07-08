@@ -432,3 +432,27 @@ class TestGetOldestTaskAgeExtended:
         assert active == {}
         assert reserved == {}
         assert stats == {}
+
+
+class TestWorkerBaselineWiring:
+    def _inspect_with(self, n: int):
+        stats = {f"celery@w{i}": {"pool": {"max-concurrency": 2}} for i in range(n)}
+        active: dict[str, list] = {k: [] for k in stats}
+        return lambda: ({}, active, {}, stats)
+
+    def test_collect_populates_expected_and_missing(self, config):
+        # grace=0 so a sustained drop confirms on the very next cycle
+        config.thresholds.worker_offline_grace_seconds = 0
+        collector = MetricsCollector(config)
+        collector.redis_client = None  # queue depth -> 0, no redis needed
+
+        collector._inspect_all = self._inspect_with(4)
+        m1 = collector.collect()
+        assert (m1.expected_workers, m1.missing_workers) == (4, 0)
+
+        collector._inspect_all = self._inspect_with(3)
+        m2 = collector.collect()  # gap starts this cycle
+        assert (m2.expected_workers, m2.missing_workers) == (4, 0)
+
+        m3 = collector.collect()  # grace=0 elapsed -> confirmed
+        assert (m3.expected_workers, m3.missing_workers) == (4, 1)
