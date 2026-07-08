@@ -4,6 +4,7 @@ Tests for kanari_agent.cli module (subcommand-based CLI)
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,6 +38,21 @@ class TestNoSubcommand:
         with pytest.raises(SystemExit) as exc:
             _run_main([])
         assert exc.value.code == 0
+
+    def test_no_subcommand_shows_quick_start(self, capsys):
+        with pytest.raises(SystemExit):
+            _run_main([])
+        out = capsys.readouterr().out
+        assert "kanari init" in out
+        assert "kanari doctor" in out
+        assert "kanari audit" in out
+        assert "kanari agent --local" in out
+
+    def test_no_subcommand_shows_version(self, capsys):
+        with pytest.raises(SystemExit):
+            _run_main([])
+        out = capsys.readouterr().out
+        assert "Kanari" in out
 
     def test_version_flag_exits(self):
         with pytest.raises(SystemExit) as exc:
@@ -194,3 +210,58 @@ class TestCliAgent:
             _run_main(["agent", "--token", "my-secret-key", "--local"])
 
         mock_agent.run.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# kanari init
+# ---------------------------------------------------------------------------
+
+
+class TestCmdInit:
+    def test_creates_config_yaml_in_tmp(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        _run_main(["init", "--output", str(output)])
+        assert output.exists()
+
+    def test_output_contains_required_keys(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        _run_main(["init", "--output", str(output)])
+        content = output.read_text()
+        for key in ("redis_url", "celery_broker_url", "celery_app_name", "thresholds"):
+            assert key in content
+
+    def test_output_is_valid_yaml(self, tmp_path: Path):
+        import yaml
+
+        output = tmp_path / "config.yaml"
+        _run_main(["init", "--output", str(output)])
+        data = yaml.safe_load(output.read_text())
+        assert isinstance(data, dict)
+        assert "redis_url" in data
+
+    def test_exits_1_if_file_exists_without_force(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        output.write_text("existing content")
+        with pytest.raises(SystemExit) as exc:
+            _run_main(["init", "--output", str(output)])
+        assert exc.value.code == 1
+        assert output.read_text() == "existing content"
+
+    def test_force_overwrites_existing_file(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        output.write_text("old content")
+        _run_main(["init", "--output", str(output), "--force"])
+        assert output.read_text() != "old content"
+        assert "redis_url" in output.read_text()
+
+    def test_default_output_filename(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        _run_main(["init"])
+        assert (tmp_path / "config.yaml").exists()
+
+    def test_prints_next_step_hint(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "audit" in out
+        assert str(output) in out
