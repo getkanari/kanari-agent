@@ -38,7 +38,7 @@ The agent finds your API key automatically in this order:
 1. `--token` flag
 2. `KANARI_API_KEY` environment variable
 3. `~/.kanari/config` — saved by `kanari login` ← **recommended**
-4. `api_key` in your `config.yaml`
+4. `api_key` in your `kanari.yaml`
 
 After running `kanari login`, you never need to set an API key manually.
 
@@ -109,7 +109,7 @@ After=network.target
 [Service]
 User=app
 EnvironmentFile=/etc/kanari/env
-ExecStart=/usr/local/bin/kanari agent --config /etc/kanari/config.yaml
+ExecStart=/usr/local/bin/kanari agent --config /etc/kanari/kanari.yaml
 Restart=on-failure
 RestartSec=10
 
