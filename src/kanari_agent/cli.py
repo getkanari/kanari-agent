@@ -86,7 +86,8 @@ thresholds:
 
     print(f"✅ Created {output}")
     print("   Edit redis_url and celery_broker_url, then run:")
-    print(f"   kanari audit --config {output}")
+    print(f"   kanari doctor --config {output}  # verify connectivity first")
+    print(f"   kanari audit  --config {output}  # one-shot health check")
 
 
 def cmd_audit(args: argparse.Namespace) -> None:

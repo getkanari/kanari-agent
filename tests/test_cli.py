@@ -259,9 +259,16 @@ class TestCmdInit:
         _run_main(["init"])
         assert (tmp_path / "config.yaml").exists()
 
-    def test_prints_next_step_hint(self, tmp_path: Path, capsys):
+    def test_prints_doctor_before_audit_in_hint(self, tmp_path: Path, capsys):
         output = tmp_path / "config.yaml"
         _run_main(["init", "--output", str(output)])
         out = capsys.readouterr().out
+        assert "doctor" in out
         assert "audit" in out
+        assert out.index("doctor") < out.index("audit")
+
+    def test_hint_includes_config_path(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
         assert str(output) in out
