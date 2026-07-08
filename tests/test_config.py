@@ -14,7 +14,11 @@ from kanari_agent.models import AlertThresholds, Config
 # Fixture to clean environment variables and ~/.kanari/config before each test
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch, tmp_path):
-    """Remove all kanari-related env vars and isolate ~/.kanari/config before each test"""
+    """Remove all kanari-related env vars and isolate ~/.kanari/config before each test.
+
+    Also changes cwd to tmp_path so that auto-discovery of kanari.yaml in the
+    project root does not bleed into tests that expect built-in defaults.
+    """
     env_vars = [
         "KANARI_API_KEY",
         "KANARI_API_URL",
@@ -25,6 +29,9 @@ def clean_env(monkeypatch, tmp_path):
     ]
     for var in env_vars:
         monkeypatch.delenv(var, raising=False)
+
+    # Isolate cwd so auto-discovery doesn't pick up the project-level kanari.yaml
+    monkeypatch.chdir(tmp_path)
 
     # Point KANARI_CONFIG_PATH to a non-existent temp path so real ~/.kanari/config
     # doesn't bleed into tests that expect default values
