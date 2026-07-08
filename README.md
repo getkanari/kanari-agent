@@ -102,20 +102,20 @@ Creates `kanari.yaml` with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_U
 **3. Verify your setup**
 
 ```bash
-kanari doctor --config kanari.yaml
+kanari doctor
 ```
 
-Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong.
+Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong. Auto-loads `kanari.yaml` from the current directory.
 
 **4. Run a health check**
 
 ```bash
-kanari audit --config kanari.yaml
+kanari audit
 ```
 
 That's it. No account, no API key, no external dependencies beyond Redis and Celery.
 
-> **Tip:** `kanari audit` also works without a config file — it connects to `redis://localhost:6379/0` by default.
+> **Tip:** All commands auto-load `kanari.yaml` from the current directory. Use `--config /path/to/file.yaml` only when the file lives somewhere else.
 
 ---
 
@@ -136,8 +136,8 @@ kanari init --force                # overwrite existing file
 Diagnose your setup before running anything else. Checks Python version, required libraries, Redis connectivity, Celery workers, and API key format.
 
 ```bash
-kanari doctor                         # check default setup
-kanari doctor --config kanari.yaml    # also validate a config file
+kanari doctor                              # auto-loads kanari.yaml if present
+kanari doctor --config /etc/kanari/prod.yaml  # explicit path
 ```
 
 Returns exit code `0` if everything passes (or only warnings), `1` if any check fails.
@@ -147,11 +147,11 @@ Returns exit code `0` if everything passes (or only warnings), `1` if any check 
 One-shot health check. Prints a report and exits with a status code.
 
 ```bash
-kanari audit                        # rich TUI report + Redis/Celery config analysis
-kanari audit --json                 # machine-readable JSON (for CI/scripts)
-kanari audit --md                   # Markdown report
-kanari audit --no-config-checks    # skip config analysis (e.g. restricted Redis)
-kanari audit --config kanari.yaml   # use config file
+kanari audit                             # auto-loads kanari.yaml; rich TUI report + config analysis
+kanari audit --json                      # machine-readable JSON (for CI/scripts)
+kanari audit --md                        # Markdown report
+kanari audit --no-config-checks         # skip config analysis (e.g. restricted Redis)
+kanari audit --config /etc/kanari/prod.yaml  # explicit config path
 ```
 
 Configuration analysis (acks_late, eviction policy, prefetch, and more) runs on every audit. On a healthy system the report shows a `✓ N checks passed` summary of everything verified. The JSON output includes a `checks_performed` array for CI assertions.
@@ -187,9 +187,9 @@ kanari watch --deep         # includes config analysis on each refresh
 Continuous monitoring loop. Runs until stopped. In local mode it logs structured JSON; in API mode it sends metrics to api.getkanari.com.
 
 ```bash
-kanari agent --local                        # log only, no API calls
-kanari agent --config kanari.yaml --local   # with config file
-kanari agent --token your-api-key           # sends metrics to api.getkanari.com
+kanari agent --local                             # log only, no API (auto-loads kanari.yaml)
+kanari agent --token your-api-key                # sends metrics to api.getkanari.com
+kanari agent --config /etc/kanari/prod.yaml      # explicit config path
 ```
 
 ---
@@ -261,7 +261,7 @@ privacy:
 ```
 
 ```bash
-kanari audit --config kanari.yaml
+kanari audit
 ```
 
 ---

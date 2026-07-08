@@ -32,8 +32,8 @@ This creates `kanari.yaml` in the current directory with sensible defaults. If `
    Redis detected at redis://localhost:6379/0
 
    Next steps:
-   kanari doctor --config kanari.yaml  # verify connectivity first
-   kanari audit  --config kanari.yaml  # one-shot health check
+   kanari doctor        # verify connectivity first
+   kanari audit         # one-shot health check
 ```
 
 Open `kanari.yaml` and update `redis_url` / `celery_broker_url` if needed, then continue.
@@ -43,10 +43,10 @@ Open `kanari.yaml` and update `redis_url` / `celery_broker_url` if needed, then 
 ## 3. Verify your setup
 
 ```bash
-kanari doctor --config kanari.yaml
+kanari doctor
 ```
 
-Checks that the required libraries are installed, Redis is reachable, and your Celery workers are responding. If anything is wrong, it tells you exactly how to fix it.
+Checks that the required libraries are installed, Redis is reachable, and your Celery workers are responding. If anything is wrong, it tells you exactly how to fix it. Automatically loads `kanari.yaml` if it's in the current directory.
 
 Fix what `doctor` reports before running `audit`.
 
@@ -55,7 +55,7 @@ Fix what `doctor` reports before running `audit`.
 ## 4. Run a health check
 
 ```bash
-kanari audit --config kanari.yaml
+kanari audit
 ```
 
 ```
@@ -92,7 +92,7 @@ Audit completed in 1.2s
 
 That's it for local monitoring. No account, no external service beyond what you already have.
 
-> **Tip:** `kanari audit` works without a config file too — it connects to `redis://localhost:6379/0` by default and prints a hint if no `--config` is provided.
+> **Tip:** If `kanari.yaml` is in your current directory, all commands load it automatically — no `--config` flag needed. If the file is somewhere else, use `kanari audit --config /path/to/kanari.yaml`.
 
 ---
 

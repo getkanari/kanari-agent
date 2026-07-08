@@ -35,8 +35,9 @@ kanari watch
 # Faster refresh during an active incident
 kanari watch --interval 2
 
-# With config file and deep analysis
-kanari watch --config kanari.yaml --deep --interval 10
+# Deep analysis with custom refresh; explicit config when not in project directory
+kanari watch --deep --interval 10
+kanari watch --config /etc/kanari/prod.yaml --deep
 ```
 
 ---

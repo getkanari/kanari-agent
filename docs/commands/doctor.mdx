@@ -89,8 +89,8 @@ All checks always run — doctor doesn't stop on the first failure.
 # Check default setup (uses env vars and localhost defaults)
 kanari doctor
 
-# Validate a specific config file
-kanari doctor --config kanari.yaml
+# Auto-loads kanari.yaml if present in current directory; explicit path otherwise
+kanari doctor --config /etc/kanari/prod.yaml
 
 # Use in CI to verify infrastructure is reachable before running an audit
 kanari doctor --no-color && kanari audit --json
@@ -137,7 +137,7 @@ Redis is up but no workers are registered. `kanari audit` will still run — it 
      → pip install pyyaml
 ```
 
-If you're using `--config kanari.yaml`, PyYAML is required. It's included in the standard `pip install kanari-agent` but may be missing in minimal environments.
+PyYAML is required to load `kanari.yaml`. It's included in the standard `pip install kanari-agent` but may be missing in minimal environments.
 
 ---
 
