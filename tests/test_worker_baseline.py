@@ -60,3 +60,19 @@ def test_auto_resolve_rebaselines_after_window():
     b.update(3, _t(60))  # gap starts at t=60
     assert b.update(3, _t(160)) == (4, 1)  # firing during grace..auto window
     assert b.update(3, _t(400)) == (3, 0)  # 340s >= 300s -> re-baseline to 3
+
+
+def test_config_thresholds_expose_worker_knobs():
+    from kanari_agent.models import AlertThresholds
+
+    t = AlertThresholds()
+    assert t.worker_offline_grace_seconds == 90
+    assert t.worker_auto_resolve_seconds is None
+
+
+def test_system_metrics_default_worker_fields():
+    from kanari_agent.models import SystemMetrics
+
+    m = SystemMetrics(timestamp="2026-07-07T10:00:00Z")
+    assert m.expected_workers == 0
+    assert m.missing_workers == 0
