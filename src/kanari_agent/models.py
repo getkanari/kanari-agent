@@ -15,6 +15,8 @@ class AlertThresholds(BaseModel):
     max_queue_size: int = 1000
     max_wait_time_seconds: int = 60
     max_task_runtime_seconds: int = 1800  # 30 minutes
+    worker_offline_grace_seconds: int = 90  # gap must persist this long before confirming
+    worker_auto_resolve_seconds: Optional[int] = None  # None = fail loud (default)
     worker_heartbeat_timeout_seconds: int = 120
     critical_queues: list[str] = Field(default_factory=list)  # empty = none critical
 
@@ -80,6 +82,8 @@ class SystemMetrics(BaseModel):
     total_active_tasks: int = 0
     total_workers: int = 0
     alive_workers: int = 0
+    expected_workers: int = 0  # baseline high-water mark (from WorkerBaseline)
+    missing_workers: int = 0  # confirmed shortfall after grace period
     total_concurrency: int = 0  # sum of all workers' max-concurrency
     saturation_pct: float = 0.0  # (active_tasks / total_concurrency) * 100
     max_latency_sec: Optional[float] = None  # oldest task age across all queues

@@ -1,15 +1,15 @@
 ---
-title: Deep Audit
+title: Configuration Analysis
 description: Detect Redis and Celery misconfigurations before they cause incidents
 ---
 
 ## Overview
 
 ```bash
-kanari audit --deep
+kanari audit
 ```
 
-The `--deep` flag adds a **Configuration Analysis** section to the audit report. It inspects your Redis and Celery runtime configuration for settings that are technically valid but will cause problems in production.
+Every audit includes a **Configuration Analysis** section (no flag needed — the old `--deep` flag is a deprecated no-op). It inspects your Redis and Celery runtime configuration for settings that are technically valid but will cause problems in production. Skip it with `--no-config-checks` if your Redis restricts `CONFIG GET`.
 
 These are the misconfigurations that cause silent task loss, cascading failures, and incidents that are very hard to debug.
 

@@ -7,11 +7,12 @@ from __future__ import annotations
 import signal
 import sys
 import time
+from typing import Optional
 
 from kanari_agent.api_client import APIClient
 from kanari_agent.collector import MetricsCollector, _redact_url
 from kanari_agent.config import AGENT_VERSION
-from kanari_agent.findings import FindingsEngine
+from kanari_agent.findings import FindingsEngine, compute_system_status
 from kanari_agent.logger import StructuredLogger
 from kanari_agent.models import Config, SystemMetrics
 
@@ -31,7 +32,7 @@ class KanariAgent:
         self.running = False
         self._consecutive_failures = 0
         self._max_consecutive_failures = 10
-        self.api_client: APIClient | None = None
+        self.api_client: Optional[APIClient] = None
 
         # Initialize API client only if not in local mode and API key provided
         if not config.local_mode and config.api_key:
@@ -63,6 +64,8 @@ class KanariAgent:
                     "total_active": metrics.total_active_tasks,
                     "total_workers": metrics.total_workers,
                     "alive_workers": metrics.alive_workers,
+                    "expected_workers": metrics.expected_workers,
+                    "missing_workers": metrics.missing_workers,
                     "total_concurrency": metrics.total_concurrency,
                     "saturation_pct": round(metrics.saturation_pct, 2),
                     "max_latency_sec": metrics.max_latency_sec,
@@ -93,6 +96,54 @@ class KanariAgent:
 
         self.logger.info("metrics_collected", mode="local", payload=payload)
 
+    def startup_audit(self) -> None:
+        """One full audit pass (findings + config smells) logged at daemon startup.
+
+        Guarantees the first thing an operator sees is an assessment, not
+        silence. Never sends anything to the API and never blocks the loop
+        from starting.
+        """
+        try:
+            from kanari_agent.config_checks import _run_config_checks
+
+            metrics = self.collector.collect()
+            engine = FindingsEngine()
+            findings = engine.analyze(metrics, self.config, self.collector.latency_available)
+            config_checks = _run_config_checks(self.collector, metrics)
+            status = compute_system_status(findings)
+
+            ok_checks = sum(1 for c in config_checks if c.status == "ok")
+            self.logger.info(
+                "startup_audit",
+                system_status=status.value,
+                findings=[
+                    {"id": f.id, "severity": f.severity.value, "title": f.title} for f in findings
+                ],
+                config_checks=[
+                    {
+                        "name": c.name,
+                        "status": c.status,
+                        "message": c.message,
+                        "recommendation": c.recommendation,
+                    }
+                    for c in config_checks
+                ],
+                checks_passed=ok_checks,
+            )
+
+            # Human-readable lines for log readers that don't parse JSON
+            for f in findings:
+                fix = f.safe_fix[0] if f.safe_fix else ""
+                self.logger.warning(
+                    f"[{f.severity.value}] {f.title}" + (f" — {fix}" if fix else "")
+                )
+            for c in config_checks:
+                if c.status != "ok":
+                    rec = f" — {c.recommendation}" if c.recommendation else ""
+                    self.logger.warning(f"[CONFIG] {c.name}: {c.message}{rec}")
+        except Exception as e:
+            self.logger.error("startup_audit_failed", error=str(e))
+
     def check_once(self) -> SystemMetrics:
         """Executes one monitoring cycle"""
         metrics = self.collector.collect()
@@ -107,6 +158,7 @@ class KanariAgent:
             f"Health: {'OK' if not findings else findings[0].severity.value} "
             f"pending={metrics.total_pending_tasks} active={metrics.total_active_tasks} "
             f"workers={metrics.alive_workers}/{metrics.total_workers} "
+            f"missing={metrics.missing_workers} "
             f"sat={metrics.saturation_pct:.0f}% max_age={lat} findings={len(findings)}"
         )
 
@@ -167,6 +219,9 @@ class KanariAgent:
         # Log monitored queues after connection (may be auto-discovered)
         queues = self.collector.get_queues_to_monitor()
         self.logger.info("Monitoring queues", queues=queues)
+
+        # Full assessment up front so the first thing seen is never silence
+        self.startup_audit()
 
         self.setup_signal_handlers()
         self.running = True

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 from importlib.metadata import PackageNotFoundError, version
+from typing import Optional
 
 from kanari_agent.models import AlertThresholds, Config, PrivacyConfig
 
@@ -24,7 +25,7 @@ except ImportError:
     YAML_AVAILABLE = False
 
 
-def load_config(config_path: str | None = None) -> Config:
+def load_config(config_path: Optional[str] = None) -> Config:
     """Loads configuration from YAML file or environment variables"""
     config_data: dict = {}
 
@@ -60,6 +61,8 @@ def load_config(config_path: str | None = None) -> Config:
                     "max_queue_size": t.get("max_queue_size", 1000),
                     "max_wait_time_seconds": t.get("max_wait_time_seconds", 60),
                     "max_task_runtime_seconds": t.get("max_task_runtime_seconds", 1800),
+                    "worker_offline_grace_seconds": t.get("worker_offline_grace_seconds", 90),
+                    "worker_auto_resolve_seconds": t.get("worker_auto_resolve_seconds"),
                 }
                 # Only set critical_queues if explicitly configured
                 if "critical_queues" in t:
@@ -105,6 +108,17 @@ def load_config(config_path: str | None = None) -> Config:
 
     if os.environ.get("CHECK_INTERVAL"):
         config_data["check_interval_seconds"] = int(os.environ["CHECK_INTERVAL"])
+
+    grace_env = os.environ.get("WORKER_OFFLINE_GRACE_SECONDS")
+    auto_env = os.environ.get("WORKER_AUTO_RESOLVE_SECONDS")
+    if grace_env is not None or auto_env is not None:
+        existing = config_data.get("thresholds")
+        base = existing.model_dump() if isinstance(existing, AlertThresholds) else {}
+        if grace_env is not None:
+            base["worker_offline_grace_seconds"] = int(grace_env)
+        if auto_env is not None:
+            base["worker_auto_resolve_seconds"] = int(auto_env)
+        config_data["thresholds"] = AlertThresholds(**base)
 
     # Privacy settings from env
     sanitize_env = os.environ.get("KANARI_SANITIZE_TASK_SIGNATURES", "").lower()

@@ -20,14 +20,20 @@ def cmd_audit(args: argparse.Namespace) -> None:
     from kanari_agent.audit import run_audit
     from kanari_agent.config import load_config
 
+    if getattr(args, "deep", False):
+        print(
+            "--deep is deprecated: configuration analysis now runs by default",
+            file=sys.stderr,
+        )
+
     config = load_config(args.config)
     exit_code = run_audit(
         config=config,
         json_output=getattr(args, "json", False),
         md_output=getattr(args, "md", False),
         no_color=getattr(args, "no_color", False),
-        deep=getattr(args, "deep", False),
         timeout=getattr(args, "timeout", 3),
+        config_checks=not getattr(args, "no_config_checks", False),
     )
     sys.exit(exit_code)
 
@@ -77,6 +83,128 @@ def cmd_alerts_configure(args: argparse.Namespace) -> None:
         slack_webhook=getattr(args, "slack_webhook", None),
         alert_email=getattr(args, "email", None),
     )
+
+
+def cmd_status(args: argparse.Namespace) -> None:
+    import urllib.error
+
+    from kanari_agent.login import _get_authed, load_kanari_config
+
+    kanari_cfg = load_kanari_config()
+    api_key = kanari_cfg.get("api_key")
+    if not api_key:
+        print("❌ Not authenticated. Run kanari login first.")
+        sys.exit(1)
+
+    api_url = getattr(args, "api_url", None) or kanari_cfg.get(
+        "api_url", "https://api.getkanari.com"
+    )
+
+    try:
+        resp = _get_authed(f"{api_url}/billing/status", api_key=api_key)
+        plan = resp.get("plan", "free")
+        subscribed = resp.get("subscribed", False)
+        sub_label = "active" if subscribed else "none"
+        print(f"Plan:         {plan}")
+        print(f"Subscription: {sub_label}")
+        if plan == "free":
+            print("\nUpgrade with: kanari upgrade --plan solo")
+    except urllib.error.HTTPError as e:
+        print(f"❌ Error {e.code}: {e.reason}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Could not reach {api_url}: {e}")
+        sys.exit(1)
+
+
+def cmd_upgrade(args: argparse.Namespace) -> None:
+    import urllib.error
+    import webbrowser
+
+    from kanari_agent.login import _post, load_kanari_config
+
+    kanari_cfg = load_kanari_config()
+    api_key = kanari_cfg.get("api_key")
+    if not api_key:
+        print("❌ Not authenticated. Run kanari login first.")
+        sys.exit(1)
+
+    api_url = getattr(args, "api_url", None) or kanari_cfg.get(
+        "api_url", "https://api.getkanari.com"
+    )
+    plan = args.plan
+
+    try:
+        resp = _post(
+            f"{api_url}/billing/checkout?plan={plan}",
+            data={},
+            api_key=api_key,
+        )
+        checkout_url = resp.get("checkout_url")
+        if not checkout_url:
+            print("❌ No checkout URL received.")
+            sys.exit(1)
+        print(f"Opening checkout for plan: {plan}")
+        print(f"URL: {checkout_url}")
+        webbrowser.open(checkout_url)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        try:
+            import json as _json
+
+            detail = _json.loads(body).get("detail", body)
+        except Exception:
+            detail = body
+        print(f"❌ Error {e.code}: {detail}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Could not reach {api_url}: {e}")
+        sys.exit(1)
+
+
+def cmd_manage_billing(args: argparse.Namespace) -> None:
+    import urllib.error
+    import webbrowser
+
+    from kanari_agent.login import _get_authed, load_kanari_config
+
+    kanari_cfg = load_kanari_config()
+    api_key = kanari_cfg.get("api_key")
+    if not api_key:
+        print("❌ Not authenticated. Run kanari login first.")
+        sys.exit(1)
+
+    api_url = getattr(args, "api_url", None) or kanari_cfg.get(
+        "api_url", "https://api.getkanari.com"
+    )
+
+    try:
+        resp = _get_authed(f"{api_url}/billing/portal", api_key=api_key)
+        portal_url = resp.get("portal_url")
+        if not portal_url:
+            print("❌ No portal URL received.")
+            sys.exit(1)
+        print("Opening billing portal...")
+        webbrowser.open(portal_url)
+    except urllib.error.HTTPError as e:
+        if e.code == 400:
+            print("❌ No billing account found. Subscribe first with: kanari upgrade --plan solo")
+        else:
+            print(f"❌ Error {e.code}: {e.reason}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Could not reach {api_url}: {e}")
+        sys.exit(1)
+
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    from kanari_agent.doctor import run_doctor
+
+    exit_code = run_doctor(
+        config_path=getattr(args, "config", None),
+        no_color=getattr(args, "no_color", False),
+    )
+    sys.exit(exit_code)
 
 
 def cmd_agent(args: argparse.Namespace) -> None:
@@ -131,6 +259,36 @@ def main() -> None:
     )
     alerts_cfg_p.set_defaults(func=cmd_alerts_configure)
 
+    # ── status ─────────────────────────────────────────────────────────────────
+    status_p = subparsers.add_parser("status", help="Show current plan and billing status")
+    status_p.add_argument("--api-url", default=None, help="Backend URL override")
+    status_p.set_defaults(func=cmd_status)
+
+    # ── upgrade ────────────────────────────────────────────────────────────────
+    upgrade_p = subparsers.add_parser("upgrade", help="Subscribe or change plan (opens browser)")
+    upgrade_p.add_argument(
+        "--plan",
+        choices=["solo", "team", "business"],
+        default="solo",
+        help="Plan to subscribe to (default: solo)",
+    )
+    upgrade_p.add_argument("--api-url", default=None, help="Backend URL override")
+    upgrade_p.set_defaults(func=cmd_upgrade)
+
+    # ── manage-billing ─────────────────────────────────────────────────────────
+    manage_p = subparsers.add_parser(
+        "manage-billing", help="Open LemonSqueezy billing portal (cancel, invoices)"
+    )
+    manage_p.add_argument("--api-url", default=None, help="Backend URL override")
+    manage_p.set_defaults(func=cmd_manage_billing)
+
+    # ── doctor ─────────────────────────────────────────────────────────────────
+    doctor_p = subparsers.add_parser(
+        "doctor", help="Diagnose setup issues (connectivity, libraries, config)"
+    )
+    _add_common_args(doctor_p)
+    doctor_p.set_defaults(func=cmd_doctor)
+
     # ── audit ──────────────────────────────────────────────────────────────────
     audit_p = subparsers.add_parser("audit", help="One-shot health check with TUI report")
     _add_common_args(audit_p)
@@ -145,7 +303,12 @@ def main() -> None:
         "--deep",
         "-d",
         action="store_true",
-        help="Deep configuration analysis (Redis/Celery settings)",
+        help="(deprecated, no-op) Configuration analysis now runs by default",
+    )
+    audit_p.add_argument(
+        "--no-config-checks",
+        action="store_true",
+        help="Skip Redis/Celery configuration analysis (e.g. restricted Redis)",
     )
     audit_p.add_argument(
         "--timeout",

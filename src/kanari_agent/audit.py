@@ -10,8 +10,15 @@ import json as json_module
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
+from kanari_agent.config_checks import (  # noqa: F401 — re-exported for back-compat
+    ConfigCheck,
+    _check_celery_config,
+    _check_infrastructure,
+    _check_redis_config,
+    _run_config_checks,
+)
 from kanari_agent.models import Config, SystemMetrics
 
 # Exit codes
@@ -29,16 +36,6 @@ class QueueTrend:
     depth_end: int
     depth_delta: int
     trend: str  # "growing", "shrinking", "stable"
-
-
-@dataclass
-class ConfigCheck:
-    """Result of a configuration check"""
-
-    name: str
-    status: str  # "ok", "warning", "critical"
-    message: str
-    recommendation: str | None = None
 
 
 @dataclass
@@ -76,6 +73,7 @@ def run_audit(
     # Legacy positional/keyword args kept for backward compatibility with old tests
     samples: int = 1,
     interval: int = 10,
+    config_checks: bool = True,
 ) -> int:
     """
     Run an audit check and print a formatted report.
@@ -85,10 +83,11 @@ def run_audit(
         json_output: Print machine-readable JSON to stdout
         md_output: Print Markdown report
         no_color: Disable ANSI colors
-        deep: Run deep configuration checks
+        deep: (deprecated, no-op) Config checks now run by default
         timeout: Maximum runtime in seconds
         samples: (legacy) Number of samples to collect
         interval: (legacy) Seconds between samples
+        config_checks: Run Redis/Celery configuration analysis (default True)
 
     Returns:
         Exit code (0=healthy, 1=warning, 2=critical)
@@ -168,9 +167,9 @@ def run_audit(
     # Use the latest sample for the report
     metrics = metrics_samples[-1]
 
-    # Run deep config checks if requested
-    config_checks: list[ConfigCheck] = []
-    if deep:
+    # Config checks run by default; `deep` kept as a deprecated way to force them
+    config_check_results: list[ConfigCheck] = []
+    if config_checks or deep:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -178,7 +177,7 @@ def run_audit(
             transient=True,
         ) as progress:
             progress.add_task(description="Running configuration analysis...", total=None)
-            config_checks = _run_config_checks(collector, metrics)
+            config_check_results = _run_config_checks(collector, metrics)
 
     # Run findings engine
     engine = FindingsEngine()
@@ -187,21 +186,58 @@ def run_audit(
     exit_code = _status_to_exit_code(system_status)
 
     # Also run legacy analysis for backward compat (combines config_checks into result)
-    result = _analyze_metrics(metrics, metrics_samples, config, config_checks)
+    result = _analyze_metrics(metrics, metrics_samples, config, config_check_results)
     # Use the higher exit code between findings-based and legacy analysis
     final_exit_code = max(exit_code, result.exit_code)
 
     elapsed = time.time() - start_time
 
+    checks_summary = _build_checks_performed(findings, config_check_results)
+
     if json_output:
-        _print_json_output(metrics, findings, system_status, final_exit_code)
+        _print_json_output(metrics, findings, system_status, final_exit_code, checks_summary)
     elif md_output:
-        _print_md_report(metrics, findings, system_status, config, elapsed)
+        _print_md_report(metrics, findings, system_status, config, elapsed, checks_summary)
     else:
-        _print_report(console, metrics, result, config, actual_samples, elapsed, deep)
+        _print_report(console, metrics, result, config, actual_samples, elapsed)
         _print_findings_section(console, findings, system_status)
+        _print_checks_summary(console, findings, config_check_results, checks_summary)
 
     return final_exit_code
+
+
+def _build_checks_performed(
+    findings: list[Any],
+    config_checks: list[ConfigCheck],
+) -> list[dict[str, str]]:
+    """Findings-engine families plus the config checks that actually ran.
+
+    Skipped checks (restricted Redis CONFIG, no inspector.conf()) never appear,
+    so the summary can't overclaim coverage.
+    """
+    from kanari_agent.findings import checks_performed
+
+    summary = checks_performed(findings)
+    summary.extend({"name": check.name, "status": check.status} for check in config_checks)
+    return summary
+
+
+def _print_checks_summary(
+    console: Any,
+    findings: list[Any],
+    config_checks: list[ConfigCheck],
+    checks_summary: list[dict[str, str]],
+) -> None:
+    """On a fully healthy run, prove depth of analysis instead of staying silent."""
+    if findings or any(c.status != "ok" for c in config_checks):
+        return
+
+    names = ", ".join(entry["name"] for entry in checks_summary)
+    suffix = "" if config_checks else "  [dim](config analysis skipped)[/dim]"
+    console.print()
+    console.print(
+        f"[green]✓ {len(checks_summary)} checks passed:[/green] [dim]{names}[/dim]{suffix}"
+    )
 
 
 def _print_json_output(
@@ -209,6 +245,7 @@ def _print_json_output(
     findings: list[Any],
     system_status: Any,
     exit_code: int,
+    checks_performed: Optional[list[dict[str, str]]] = None,
 ) -> None:
     """Print JSON summary to stdout."""
     from kanari_agent.findings import top_findings
@@ -231,6 +268,7 @@ def _print_json_output(
         "system_status": system_status.value,
         "exit_code": exit_code,
         "top_findings": top_list,
+        "checks_performed": checks_performed or [],
         "metrics": {
             "total_pending": metrics.total_pending_tasks,
             "total_active": metrics.total_active_tasks,
@@ -249,6 +287,7 @@ def _print_md_report(
     system_status: Any,
     config: Config,
     elapsed: float,
+    checks_performed: Optional[list[dict[str, str]]] = None,
 ) -> None:
     """Print Markdown report to stdout."""
     lines = [
@@ -268,6 +307,13 @@ def _print_md_report(
             lines.append(f"- **[{f.severity.value}]** {f.title}")
     else:
         lines.append("- No findings — system healthy")
+
+    if checks_performed:
+        lines.append("")
+        lines.append("## Checks Performed")
+        for entry in checks_performed:
+            icon = "✓" if entry["status"] == "ok" else "✗"
+            lines.append(f"- {icon} {entry['name']}")
 
     print("\n".join(lines))
 
@@ -298,7 +344,11 @@ def run_watch(
     no_color: bool = False,
     deep: bool = False,
 ) -> None:
-    """Run the audit in a loop, refreshing every `interval` seconds."""
+    """Run the audit in a loop, refreshing every `interval` seconds.
+
+    Config checks stay opt-in here (--deep): inspector.conf() on every
+    refresh would add latency for information that doesn't change per cycle.
+    """
     from rich.console import Console
 
     console = Console(no_color=no_color)
@@ -306,266 +356,10 @@ def run_watch(
     while True:
         try:
             console.clear()
-            run_audit(config, no_color=no_color, deep=deep)
+            run_audit(config, no_color=no_color, config_checks=deep)
             time.sleep(interval)
         except KeyboardInterrupt:
             break
-
-
-def _run_config_checks(collector: Any, metrics: SystemMetrics) -> list[ConfigCheck]:
-    """Run deep configuration checks on Redis and Celery"""
-    checks: list[ConfigCheck] = []
-
-    # Redis checks
-    if collector.redis_client:
-        checks.extend(_check_redis_config(collector.redis_client))
-
-    # Celery checks
-    if collector.celery_app:
-        checks.extend(_check_celery_config(collector.celery_app, metrics))
-
-    # Infrastructure checks
-    checks.extend(_check_infrastructure(metrics))
-
-    return checks
-
-
-def _check_redis_config(redis_client: Any) -> list[ConfigCheck]:
-    """Check Redis configuration"""
-    checks = []
-
-    try:
-        # Check maxmemory
-        maxmemory = redis_client.config_get("maxmemory").get("maxmemory", "0")
-        if maxmemory == "0" or maxmemory == 0:
-            checks.append(
-                ConfigCheck(
-                    name="Redis maxmemory",
-                    status="warning",
-                    message="Not set (risk of OOM)",
-                    recommendation="CONFIG SET maxmemory 2gb",
-                )
-            )
-        else:
-            # Check memory usage
-            info = redis_client.info("memory")
-            used = info.get("used_memory", 0)
-            max_mem = int(maxmemory)
-            if max_mem > 0:
-                usage_pct = (used / max_mem) * 100
-                if usage_pct > 80:
-                    checks.append(
-                        ConfigCheck(
-                            name="Redis memory",
-                            status="warning",
-                            message=f"{usage_pct:.1f}% used (near capacity)",
-                            recommendation="Consider increasing maxmemory or scaling",
-                        )
-                    )
-                else:
-                    checks.append(
-                        ConfigCheck(
-                            name="Redis memory",
-                            status="ok",
-                            message=f"{usage_pct:.1f}% used",
-                        )
-                    )
-    except Exception:  # nosec B110 — Redis CONFIG GET may be disabled; skip gracefully
-        pass  # Skip if no permission
-
-    try:
-        # Check maxmemory-policy
-        policy = redis_client.config_get("maxmemory-policy").get("maxmemory-policy", "noeviction")
-        if policy == "noeviction":
-            checks.append(
-                ConfigCheck(
-                    name="Redis eviction policy",
-                    status="warning",
-                    message="noeviction (writes fail when full)",
-                    recommendation="CONFIG SET maxmemory-policy volatile-lru",
-                )
-            )
-        else:
-            checks.append(
-                ConfigCheck(
-                    name="Redis eviction policy",
-                    status="ok",
-                    message=policy,
-                )
-            )
-    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
-        pass
-
-    try:
-        # Check persistence
-        save_config = redis_client.config_get("save").get("save", "")
-        if not save_config:
-            checks.append(
-                ConfigCheck(
-                    name="Redis persistence",
-                    status="warning",
-                    message="Disabled (data loss on restart)",
-                    recommendation="Consider enabling RDB or AOF persistence",
-                )
-            )
-        else:
-            checks.append(
-                ConfigCheck(
-                    name="Redis persistence",
-                    status="ok",
-                    message="Enabled",
-                )
-            )
-    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
-        pass
-
-    try:
-        # Check connection pool / max clients
-        info = redis_client.info("clients")
-        connected = info.get("connected_clients", 0)
-        max_clients_raw = redis_client.config_get("maxclients").get("maxclients", "10000")
-        max_clients = int(max_clients_raw)
-
-        if max_clients > 0:
-            client_usage_pct = (connected / max_clients) * 100
-            if client_usage_pct > 80:
-                checks.append(
-                    ConfigCheck(
-                        name="Redis connection pool",
-                        status="warning",
-                        message=f"{connected}/{max_clients} connections ({client_usage_pct:.1f}%)",
-                        recommendation="Increase maxclients or review connection pooling",
-                    )
-                )
-            else:
-                checks.append(
-                    ConfigCheck(
-                        name="Redis connection pool",
-                        status="ok",
-                        message=f"{connected}/{max_clients} connections",
-                    )
-                )
-    except Exception:  # nosec B110 — CONFIG GET may be restricted; skip gracefully
-        pass
-
-    return checks
-
-
-def _check_celery_config(celery_app: Any, metrics: SystemMetrics) -> list[ConfigCheck]:
-    """Check Celery configuration"""
-    checks = []
-
-    try:
-        inspector = celery_app.control.inspect(timeout=5)
-        conf = inspector.conf() or {}
-
-        if conf:
-            # Get first worker's config (they should all be the same)
-            worker_conf: dict = next(iter(conf.values()), {})
-
-            # Check task_acks_late
-            acks_late = worker_conf.get("task_acks_late", False)
-            if not acks_late:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery task_acks_late",
-                        status="warning",
-                        message="False (task loss if worker dies)",
-                        recommendation="Set task_acks_late=True in Celery config",
-                    )
-                )
-            else:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery task_acks_late",
-                        status="ok",
-                        message="True (safe)",
-                    )
-                )
-
-            # Check task_reject_on_worker_lost
-            reject_on_lost = worker_conf.get("task_reject_on_worker_lost", False)
-            if not reject_on_lost:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery task_reject_on_worker_lost",
-                        status="warning",
-                        message="False (silent task loss possible)",
-                        recommendation="Set task_reject_on_worker_lost=True",
-                    )
-                )
-            else:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery task_reject_on_worker_lost",
-                        status="ok",
-                        message="True (safe)",
-                    )
-                )
-
-            # Check prefetch_multiplier
-            prefetch = worker_conf.get("worker_prefetch_multiplier", 4)
-            if prefetch > 1:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery prefetch_multiplier",
-                        status="warning",
-                        message=f"{prefetch} (may cause uneven distribution)",
-                        recommendation="Set worker_prefetch_multiplier=1 for long tasks",
-                    )
-                )
-            else:
-                checks.append(
-                    ConfigCheck(
-                        name="Celery prefetch_multiplier",
-                        status="ok",
-                        message=f"{prefetch} (optimized)",
-                    )
-                )
-
-    except Exception:  # nosec B110 — Celery inspect may be unavailable; skip gracefully
-        pass
-
-    return checks
-
-
-def _check_infrastructure(metrics: SystemMetrics) -> list[ConfigCheck]:
-    """Check infrastructure-level concerns"""
-    checks = []
-
-    # Check for single point of failure
-    if metrics.alive_workers == 1:
-        checks.append(
-            ConfigCheck(
-                name="Worker redundancy",
-                status="warning",
-                message="Only 1 worker (single point of failure)",
-                recommendation="Add redundant workers for high availability",
-            )
-        )
-    elif metrics.alive_workers > 1:
-        checks.append(
-            ConfigCheck(
-                name="Worker redundancy",
-                status="ok",
-                message=f"{metrics.alive_workers} workers (redundant)",
-            )
-        )
-
-    # Check total concurrency vs queue depth
-    if metrics.total_concurrency > 0 and metrics.total_pending_tasks > 0:
-        tasks_per_slot = metrics.total_pending_tasks / metrics.total_concurrency
-        if tasks_per_slot > 100:
-            checks.append(
-                ConfigCheck(
-                    name="Queue backlog ratio",
-                    status="warning",
-                    message=f"{tasks_per_slot:.0f} pending tasks per slot",
-                    recommendation="Consider scaling workers to reduce backlog",
-                )
-            )
-
-    return checks
 
 
 def _calculate_trends(samples: list[SystemMetrics]) -> list[QueueTrend]:
@@ -764,7 +558,6 @@ def _print_report(
     config: Config,
     samples: int,
     elapsed: float,
-    deep: bool,
 ) -> None:
     """Print the formatted audit report using rich"""
     from rich.panel import Panel
@@ -977,8 +770,8 @@ def _print_report(
                     f"  [green]↓ {t.name}: {t.depth_delta} tasks ({t.depth_start} → {t.depth_end})[/green]"
                 )
 
-    # Configuration Analysis (only if deep mode)
-    if deep and result.config_checks:
+    # Configuration Analysis
+    if result.config_checks:
         console.print()
         console.print("[bold]Configuration Analysis[/bold]")
 

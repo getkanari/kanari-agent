@@ -30,7 +30,19 @@ If Redis is on localhost with default settings, skip this — those are already 
 
 ---
 
-## 3. Run a health check
+## 3. Verify your setup
+
+```bash
+kanari doctor
+```
+
+This checks that the required libraries are installed, Redis is reachable, and your Celery workers are responding. If anything is wrong, it tells you exactly how to fix it.
+
+If everything is green, move on. If not, fix what `doctor` reports before running `audit`.
+
+---
+
+## 4. Run a health check
 
 ```bash
 kanari audit
@@ -72,7 +84,7 @@ That's it for local monitoring. No account, no external service beyond what you 
 
 ---
 
-## 4. Connect to Kanari for alerts (optional)
+## 5. Connect to Kanari for alerts (optional)
 
 To get Slack and email alerts when something breaks, connect the agent to your Kanari account:
 
@@ -102,6 +114,9 @@ The agent runs in the background, collects metrics every 15 seconds, and sends y
 ## Next steps
 
 <CardGroup cols={2}>
+  <Card title="kanari doctor" icon="stethoscope" href="/commands/doctor">
+    Diagnose connection issues, missing libraries, and config errors in one command.
+  </Card>
   <Card title="Enable latency tracking" icon="clock" href="/guides/latency-tracking">
     Add one line to your Celery app to measure real queue wait times.
   </Card>
@@ -110,8 +125,5 @@ The agent runs in the background, collects metrics every 15 seconds, and sends y
   </Card>
   <Card title="CI/CD integration" icon="code-branch" href="/guides/cicd">
     Use exit codes to fail your pipeline when Celery issues are detected.
-  </Card>
-  <Card title="Findings reference" icon="triangle-exclamation" href="/reference/findings">
-    Learn what each finding means and how to fix it.
   </Card>
 </CardGroup>

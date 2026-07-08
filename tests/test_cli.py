@@ -74,7 +74,7 @@ class TestCliAudit:
         call_kwargs = mock_audit.call_args[1]
         assert call_kwargs.get("json_output") is True
 
-    def test_audit_with_deep_flag(self):
+    def test_audit_deep_flag_is_accepted_and_noop(self, capsys):
         cfg = Config()
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
@@ -83,7 +83,33 @@ class TestCliAudit:
             with pytest.raises(SystemExit):
                 _run_main(["audit", "--deep"])
         call_kwargs = mock_audit.call_args[1]
-        assert call_kwargs.get("deep") is True
+        # --deep no longer forwards; config checks run by default
+        assert "deep" not in call_kwargs
+        assert call_kwargs.get("config_checks") is True
+        assert "deprecated" in capsys.readouterr().err
+
+    def test_audit_no_config_checks_flag(self):
+        cfg = Config()
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0) as mock_audit,
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit", "--no-config-checks"])
+        call_kwargs = mock_audit.call_args[1]
+        assert call_kwargs.get("config_checks") is False
+
+    def test_audit_config_checks_default_on_without_deprecation_notice(self, capsys):
+        cfg = Config()
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0) as mock_audit,
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit"])
+        call_kwargs = mock_audit.call_args[1]
+        assert call_kwargs.get("config_checks") is True
+        assert "deprecated" not in capsys.readouterr().err
 
     def test_audit_exit_code_propagated(self):
         cfg = Config()

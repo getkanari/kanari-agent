@@ -19,11 +19,14 @@ from kanari_agent.audit import (
     ConfigCheck,
     QueueTrend,
     _analyze_metrics,
+    _build_checks_performed,
     _calculate_trends,
     _check_celery_config,
     _check_infrastructure,
     _check_redis_config,
     _is_queue_congested,
+    _print_checks_summary,
+    _print_md_report,
     _print_report,
     _run_config_checks,
     run_audit,
@@ -559,13 +562,13 @@ def _console():
 
 
 class TestPrintReport:
-    def _call(self, result, metrics=None, samples=1, deep=False):
+    def _call(self, result, metrics=None, samples=1):
         from kanari_agent.models import Config
 
         console = _console()
         m = metrics or _metrics(redis_connected=True, celery_connected=True)
         cfg = Config()
-        _print_report(console, m, result, cfg, samples, 1.5, deep)
+        _print_report(console, m, result, cfg, samples, 1.5)
 
     def test_healthy_report_no_error(self):
         result = AuditResult(exit_code=EXIT_HEALTHY)
@@ -600,7 +603,7 @@ class TestPrintReport:
         )
         self._call(result, samples=3)
 
-    def test_deep_report_with_config_checks(self):
+    def test_report_with_config_checks_renders_table(self):
         result = AuditResult(
             exit_code=EXIT_WARNING,
             config_checks=[
@@ -608,7 +611,14 @@ class TestPrintReport:
                 ConfigCheck(name="Redis eviction", status="ok", message="volatile-lru"),
             ],
         )
-        self._call(result, deep=True)
+        from kanari_agent.models import Config
+
+        console = _console()
+        m = _metrics(redis_connected=True, celery_connected=True)
+        _print_report(console, m, result, Config(), 1, 1.5)
+        output = console.file.getvalue()
+        assert "Configuration Analysis" in output
+        assert "Redis maxmemory" in output
 
     def test_report_with_workers_and_queues(self):
         from kanari_agent.models import QueueMetrics, WorkerMetrics
@@ -715,3 +725,156 @@ class TestRunAudit:
             result = run_audit(config, deep=True)
 
         assert result in (EXIT_HEALTHY, EXIT_WARNING, EXIT_CRITICAL)
+
+    def _healthy_setup(self):
+        """Collector mock for a healthy 2-worker system with no real redis/celery clients."""
+        metrics = SystemMetrics(
+            timestamp="2026-01-01T00:00:00+00:00",
+            redis_connected=True,
+            celery_connected=True,
+            alive_workers=2,
+            total_workers=2,
+        )
+        collector = self._mock_collector(connect_ok=True, metrics=metrics)
+        collector.redis_client = None
+        collector.celery_app = None
+        collector.latency_available = False
+        return collector
+
+    def test_config_checks_run_by_default(self):
+        from kanari_agent.models import Config
+
+        collector = self._healthy_setup()
+        with (
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
+            patch("kanari_agent.audit._run_config_checks", return_value=[]) as mock_checks,
+        ):
+            mock_cls.return_value = collector
+            run_audit(Config())
+
+        mock_checks.assert_called_once()
+
+    def test_no_config_checks_skips(self):
+        from kanari_agent.models import Config
+
+        collector = self._healthy_setup()
+        with (
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
+            patch("kanari_agent.audit._run_config_checks", return_value=[]) as mock_checks,
+        ):
+            mock_cls.return_value = collector
+            run_audit(Config(), config_checks=False)
+
+        mock_checks.assert_not_called()
+
+    def test_config_warnings_do_not_change_exit_code(self):
+        """Exit-code contract lock: config-check warnings never escalate the exit code."""
+        from kanari_agent.models import Config
+
+        warning_check = ConfigCheck(
+            name="Redis maxmemory",
+            status="warning",
+            message="Not set (risk of OOM)",
+            recommendation="CONFIG SET maxmemory 2gb",
+        )
+        collector = self._healthy_setup()
+        with (
+            patch("kanari_agent.collector.MetricsCollector") as mock_cls,
+            patch("rich.console.Console", return_value=_console()),
+            patch("kanari_agent.audit._run_config_checks", return_value=[warning_check]),
+        ):
+            mock_cls.return_value = collector
+            result = run_audit(Config())
+
+        assert result == EXIT_HEALTHY
+
+
+# ---------------------------------------------------------------------------
+# _build_checks_performed / _print_checks_summary
+# ---------------------------------------------------------------------------
+
+
+class TestBuildChecksPerformed:
+    def test_combines_findings_families_and_config_checks(self):
+        from kanari_agent.findings import CHECK_FAMILIES
+
+        checks = [
+            ConfigCheck(name="Redis maxmemory", status="warning", message="Not set"),
+            ConfigCheck(name="Celery task_acks_late", status="ok", message="True (safe)"),
+        ]
+        summary = _build_checks_performed([], checks)
+
+        assert len(summary) == len(CHECK_FAMILIES) + 2
+        names = [entry["name"] for entry in summary]
+        assert "redis connectivity" in names
+        assert "Redis maxmemory" in names
+        assert "Celery task_acks_late" in names
+
+    def test_skipped_config_checks_never_appear(self):
+        from kanari_agent.findings import CHECK_FAMILIES
+
+        summary = _build_checks_performed([], [])
+        assert len(summary) == len(CHECK_FAMILIES)
+
+
+class TestPrintChecksSummary:
+    def _summary_output(self, findings, config_checks):
+        console = _console()
+        checks_summary = _build_checks_performed(findings, config_checks)
+        _print_checks_summary(console, findings, config_checks, checks_summary)
+        return console.file.getvalue()
+
+    def test_healthy_run_shows_checks_passed(self):
+        checks = [ConfigCheck(name="Redis eviction policy", status="ok", message="volatile-lru")]
+        output = self._summary_output([], checks)
+        assert "checks passed" in output
+        assert "redis connectivity" in output
+        assert "Redis eviction policy" in output
+
+    def test_summary_absent_when_findings_exist(self):
+        from kanari_agent.findings import Finding, Severity
+
+        findings = [
+            Finding(id="NO_WORKERS", severity=Severity.CRITICAL, title="", impact="", evidence={})
+        ]
+        output = self._summary_output(findings, [])
+        assert output == ""
+
+    def test_summary_absent_when_config_warning_exists(self):
+        checks = [ConfigCheck(name="Redis maxmemory", status="warning", message="Not set")]
+        output = self._summary_output([], checks)
+        assert output == ""
+
+    def test_summary_notes_skipped_config_analysis(self):
+        output = self._summary_output([], [])
+        assert "checks passed" in output
+        assert "config analysis skipped" in output
+
+
+# ---------------------------------------------------------------------------
+# _print_md_report — Checks Performed section
+# ---------------------------------------------------------------------------
+
+
+class TestMdChecksPerformed:
+    def test_md_includes_checks_performed_section(self, capsys):
+        from kanari_agent.findings import SystemStatus
+
+        checks = [
+            {"name": "redis connectivity", "status": "ok"},
+            {"name": "Celery task_acks_late", "status": "warning"},
+        ]
+        _print_md_report(_metrics(), [], SystemStatus.OK, Config(), 1.0, checks)
+
+        output = capsys.readouterr().out
+        assert "## Checks Performed" in output
+        assert "- ✓ redis connectivity" in output
+        assert "- ✗ Celery task_acks_late" in output
+
+    def test_md_omits_section_when_no_checks(self, capsys):
+        from kanari_agent.findings import SystemStatus
+
+        _print_md_report(_metrics(), [], SystemStatus.OK, Config(), 1.0, None)
+        assert "## Checks Performed" not in capsys.readouterr().out

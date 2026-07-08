@@ -20,7 +20,8 @@ kanari audit
 | `--config`, `-c` | — | Path to a YAML config file |
 | `--json` | off | Output machine-readable JSON instead of TUI |
 | `--md` | off | Output a Markdown report |
-| `--deep`, `-d` | off | Include Redis and Celery configuration analysis |
+| `--no-config-checks` | off | Skip Redis/Celery configuration analysis (runs by default) |
+| `--deep`, `-d` | — | Deprecated no-op — configuration analysis now runs by default |
 | `--timeout` | `3.0` | Max seconds to wait for connections and metrics |
 | `--no-color` | off | Disable ANSI colors (useful in CI logs) |
 
@@ -104,13 +105,9 @@ The config file lets you set custom thresholds, specify which queues to monitor,
 
 ---
 
-## Deep mode
+## Configuration analysis
 
-```bash
-kanari audit --deep
-```
-
-Adds a **Configuration Analysis** section to the report that checks your Redis and Celery settings for common production risks. See [Deep Audit](/guides/deep-audit) for details.
+Every audit includes a **Configuration Analysis** section that checks your Redis and Celery settings for common production risks — no flag needed. Use `--no-config-checks` to skip it. See [Configuration Analysis](/guides/deep-audit) for details.
 
 ---
 
@@ -123,8 +120,8 @@ kanari audit
 # CI gate — fail pipeline if critical issues found
 kanari audit --json && echo "Celery healthy"
 
-# Debug an incident with full config analysis
-kanari audit --deep --no-color 2>&1 | tee incident-$(date +%Y%m%d).log
+# Debug an incident, saving the full report
+kanari audit --no-color 2>&1 | tee incident-$(date +%Y%m%d).log
 
 # Check a specific environment
 REDIS_URL=redis://staging-redis:6379/0 kanari audit

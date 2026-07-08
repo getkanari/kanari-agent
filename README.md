@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
 [![Python versions](https://img.shields.io/pypi/pyversions/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
-[![Tests](https://github.com/herchila/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/herchila/kanari-agent/actions/workflows/tests.yml)
+[![Tests](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Monitoring agent for Celery + Redis queues. One command to know if your workers are healthy, your queues are draining, and your tasks aren't stuck.
@@ -98,7 +98,15 @@ export REDIS_URL=redis://your-redis:6379
 export CELERY_BROKER_URL=redis://your-redis:6379/0
 ```
 
-**3. Run a health check**
+**3. Verify your setup**
+
+```bash
+kanari doctor
+```
+
+Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong.
+
+**4. Run a health check**
 
 ```bash
 kanari audit
@@ -110,17 +118,30 @@ That's it. No account, no API key, no external dependencies beyond Redis and Cel
 
 ## Commands
 
+### `kanari doctor`
+
+Diagnose your setup before running anything else. Checks Python version, required libraries, Redis connectivity, Celery workers, and API key format.
+
+```bash
+kanari doctor                         # check default setup
+kanari doctor --config config.yaml    # also validate a config file
+```
+
+Returns exit code `0` if everything passes (or only warnings), `1` if any check fails.
+
 ### `kanari audit`
 
 One-shot health check. Prints a report and exits with a status code.
 
 ```bash
-kanari audit                        # rich TUI report
+kanari audit                        # rich TUI report + Redis/Celery config analysis
 kanari audit --json                 # machine-readable JSON (for CI/scripts)
 kanari audit --md                   # Markdown report
-kanari audit --deep                 # includes Redis + Celery config analysis
+kanari audit --no-config-checks    # skip config analysis (e.g. restricted Redis)
 kanari audit --config config.yaml   # use config file
 ```
+
+Configuration analysis (acks_late, eviction policy, prefetch, and more) runs on every audit. On a healthy system the report shows a `✓ N checks passed` summary of everything verified. The JSON output includes a `checks_performed` array for CI assertions.
 
 **Exit codes** — integrate directly into CI/CD:
 
@@ -244,9 +265,9 @@ Kanari doesn't just show metrics — it tells you what's wrong and how to fix it
 
 ---
 
-## Deep Audit
+## Configuration Analysis
 
-`kanari audit --deep` inspects your Redis and Celery configuration for common production misconfigurations:
+Every `kanari audit` inspects your Redis and Celery configuration for common production misconfigurations (`--deep` is no longer needed and is kept only as a deprecated no-op):
 
 | Check | Risk if wrong |
 |-------|---------------|
