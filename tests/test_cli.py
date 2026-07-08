@@ -137,7 +137,10 @@ class TestCliAudit:
                 _run_main(["audit"])
         assert exc.value.code == 2
 
-    def test_audit_without_config_prints_defaults_hint(self, capsys):
+    def test_audit_without_config_and_no_kanari_yaml_prints_hint(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        monkeypatch.chdir(tmp_path)  # cwd has no kanari.yaml
         cfg = Config()
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
@@ -146,12 +149,27 @@ class TestCliAudit:
             with pytest.raises(SystemExit):
                 _run_main(["audit"])
         out = capsys.readouterr().out
-        assert "localhost" in out
         assert "kanari init" in out
 
-    def test_audit_with_config_skips_defaults_hint(self, tmp_path: Path, capsys):
+    def test_audit_without_config_but_kanari_yaml_exists_shows_using_hint(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        (tmp_path / "kanari.yaml").write_text("redis_url: redis://localhost:6379/0\n")
+        monkeypatch.chdir(tmp_path)
         cfg = Config()
-        config_file = tmp_path / "config.yaml"
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit"])
+        out = capsys.readouterr().out
+        assert "Using kanari.yaml" in out
+        assert "kanari init" not in out
+
+    def test_audit_with_explicit_config_skips_hints(self, tmp_path: Path, capsys):
+        cfg = Config()
+        config_file = tmp_path / "prod.yaml"
         config_file.write_text("redis_url: redis://localhost:6379/0\n")
         with (
             patch("kanari_agent.config.load_config", return_value=cfg),
@@ -161,6 +179,7 @@ class TestCliAudit:
                 _run_main(["audit", "--config", str(config_file)])
         out = capsys.readouterr().out
         assert "kanari init" not in out
+        assert "Using" not in out
 
 
 # ---------------------------------------------------------------------------

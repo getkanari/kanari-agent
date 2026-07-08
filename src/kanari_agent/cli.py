@@ -14,14 +14,17 @@ def _print_welcome() -> None:
     print(f"Kanari — on-call monitoring for Celery + Redis  v{AGENT_VERSION}")
     print()
     print("  Quick start (no account needed):")
-    print("    kanari init                         # generate kanari.yaml")
-    print("    kanari doctor --config kanari.yaml  # verify connectivity")
-    print("    kanari audit  --config kanari.yaml  # one-shot health check")
-    print("    kanari watch  --config kanari.yaml  # live dashboard")
+    print("    kanari init    # generate kanari.yaml")
+    print("    kanari doctor  # verify connectivity")
+    print("    kanari audit   # one-shot health check")
+    print("    kanari watch   # live dashboard")
     print()
     print("  With an account (automatic alerts):")
-    print("    kanari login                        # authenticate")
-    print("    kanari agent  --config kanari.yaml  # start monitoring daemon")
+    print("    kanari login   # authenticate")
+    print("    kanari agent   # start monitoring daemon")
+    print()
+    print("  Config in a different location?")
+    print("    kanari audit --config /etc/kanari/prod.yaml")
     print()
     print("  Tips:")
     print("    No config?   kanari audit connects to localhost defaults.")
@@ -119,16 +122,25 @@ thresholds:
 
     print()
     print("   Next steps:")
-    print(f"   kanari doctor --config {output}  # verify connectivity first")
-    print(f"   kanari audit  --config {output}  # one-shot health check")
-    print()
-    print("   No Kanari account yet? Run the agent in local mode:")
-    print(f"   kanari agent  --local --config {output}  # logs metrics to stdout, no API")
+    if output == "kanari.yaml":
+        print("   kanari doctor        # verify connectivity (auto-loads kanari.yaml)")
+        print("   kanari audit         # one-shot health check")
+        print()
+        print("   No Kanari account yet?")
+        print("   kanari agent --local  # logs metrics to stdout, no API")
+    else:
+        print(f"   kanari doctor --config {output}  # verify connectivity first")
+        print(f"   kanari audit  --config {output}  # one-shot health check")
+        print()
+        print("   No Kanari account yet?")
+        print(f"   kanari agent --local --config {output}  # logs metrics to stdout, no API")
 
 
 def cmd_audit(args: argparse.Namespace) -> None:
+    import os
+
     from kanari_agent.audit import run_audit
-    from kanari_agent.config import load_config
+    from kanari_agent.config import DEFAULT_CONFIG_FILENAME, load_config
 
     if getattr(args, "deep", False):
         print(
@@ -137,9 +149,13 @@ def cmd_audit(args: argparse.Namespace) -> None:
         )
 
     if not args.config:
-        print("💡 No --config specified — connecting to localhost defaults.")
-        print("   Run 'kanari init' to generate a kanari.yaml.")
-        print()
+        if os.path.exists(DEFAULT_CONFIG_FILENAME):
+            print(f"💡 Using {DEFAULT_CONFIG_FILENAME}")
+            print()
+        else:
+            print("💡 No kanari.yaml found — connecting to localhost defaults.")
+            print("   Run 'kanari init' to generate one.")
+            print()
 
     config = load_config(args.config)
     exit_code = run_audit(

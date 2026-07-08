@@ -16,11 +16,11 @@ kanari init
    Redis detected at redis://localhost:6379/0
 
    Next steps:
-   kanari doctor --config kanari.yaml  # verify connectivity first
-   kanari audit  --config kanari.yaml  # one-shot health check
+   kanari doctor        # verify connectivity (auto-loads kanari.yaml)
+   kanari audit         # one-shot health check
 
-   No Kanari account yet? Run the agent in local mode:
-   kanari agent  --local --config kanari.yaml  # logs metrics to stdout, no API
+   No Kanari account yet?
+   kanari agent --local  # logs metrics to stdout, no API
 ```
 
 ---
@@ -107,12 +107,18 @@ Edit `redis_url` and `celery_broker_url` to match your infrastructure. All other
 After `kanari init`, the recommended flow is:
 
 ```bash
-kanari doctor --config kanari.yaml   # verify connectivity and libraries
-kanari audit  --config kanari.yaml   # run your first health check
+kanari doctor   # verify connectivity and libraries (auto-loads kanari.yaml)
+kanari audit    # run your first health check
+```
+
+All commands auto-discover `kanari.yaml` in the current directory. Only use `--config` if the file lives somewhere else:
+
+```bash
+kanari doctor --config /etc/kanari/prod.yaml
 ```
 
 No Kanari account yet? Use local mode to run the monitoring daemon without any API calls:
 
 ```bash
-kanari agent --local --config kanari.yaml
+kanari agent --local
 ```
