@@ -9,7 +9,8 @@ Kanari is a monitoring agent built specifically for Celery + Redis. It detects t
 
 ```bash
 pip install kanari-agent
-kanari audit
+kanari init    # generate config.yaml (auto-detects REDIS_URL)
+kanari audit --config config.yaml
 ```
 
 No account needed. No external service. Point it at your Redis and get a full health report in under a minute.
@@ -48,6 +49,9 @@ It then runs a [findings engine](/docs/reference/findings) that produces structu
 ## Commands
 
 <CardGroup cols={2}>
+  <Card title="kanari init" icon="file-plus" href="/docs/commands/init">
+    Generate a starter config.yaml. Auto-detects connection URLs from the environment and probes Redis.
+  </Card>
   <Card title="kanari doctor" icon="stethoscope" href="/docs/commands/doctor">
     Diagnose setup issues. Checks connectivity, libraries, config, and API key before you run anything else.
   </Card>
@@ -78,13 +82,14 @@ It then runs a [findings engine](/docs/reference/findings) that produces structu
 `kanari login` connects the agent to your Kanari account. After that, `kanari agent` runs in the background and sends you Slack or email alerts the moment something breaks.
 
 ```bash
-# Free: instant health check, no account needed
-kanari audit
+# Free: generate config and run a health check
+kanari init
+kanari audit --config config.yaml
 
 # Paid: continuous monitoring with alerts
 kanari login
 kanari alerts configure --slack-webhook https://...
-kanari agent
+kanari agent --config config.yaml
 ```
 
 ---
