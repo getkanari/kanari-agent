@@ -275,3 +275,25 @@ class TestKanariConfigFile:
         assert loaded["api_key"] == "sk_abc123"  # pragma: allowlist secret
         assert loaded["api_url"] == "http://example.com"
         assert oct(config_file.stat().st_mode)[-3:] == "600"
+
+
+def test_load_config_reads_worker_knobs_from_yaml(tmp_path):
+    from kanari_agent.config import load_config
+
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        "thresholds:\n  worker_offline_grace_seconds: 45\n  worker_auto_resolve_seconds: 1800\n"
+    )
+    cfg = load_config(str(cfg_file))
+    assert cfg.thresholds.worker_offline_grace_seconds == 45
+    assert cfg.thresholds.worker_auto_resolve_seconds == 1800
+
+
+def test_worker_knobs_env_override(tmp_path, monkeypatch):
+    from kanari_agent.config import load_config
+
+    monkeypatch.setenv("WORKER_OFFLINE_GRACE_SECONDS", "10")
+    monkeypatch.setenv("WORKER_AUTO_RESOLVE_SECONDS", "600")
+    cfg = load_config(None)
+    assert cfg.thresholds.worker_offline_grace_seconds == 10
+    assert cfg.thresholds.worker_auto_resolve_seconds == 600

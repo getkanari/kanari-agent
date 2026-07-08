@@ -381,3 +381,20 @@ class TestSendHeartbeat:
     def test_returns_false_on_failure(self, client):
         with patch.object(client, "_make_request", return_value=(False, None)):
             assert client.send_heartbeat() is False
+
+
+def test_build_payload_includes_worker_baseline_fields():
+    from kanari_agent.api_client import APIClient
+    from kanari_agent.models import SystemMetrics
+
+    client = APIClient(api_key="sk_test_placeholder", api_url="https://example.test")
+    metrics = SystemMetrics(
+        timestamp="2026-07-07T10:00:00Z",
+        total_workers=3,
+        alive_workers=3,
+        expected_workers=4,
+        missing_workers=1,
+    )
+    payload = client.build_payload(metrics)
+    assert payload["metrics"]["expected_workers"] == 4
+    assert payload["metrics"]["missing_workers"] == 1

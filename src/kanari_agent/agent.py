@@ -63,6 +63,8 @@ class KanariAgent:
                     "total_active": metrics.total_active_tasks,
                     "total_workers": metrics.total_workers,
                     "alive_workers": metrics.alive_workers,
+                    "expected_workers": metrics.expected_workers,
+                    "missing_workers": metrics.missing_workers,
                     "total_concurrency": metrics.total_concurrency,
                     "saturation_pct": round(metrics.saturation_pct, 2),
                     "max_latency_sec": metrics.max_latency_sec,
@@ -155,6 +157,7 @@ class KanariAgent:
             f"Health: {'OK' if not findings else findings[0].severity.value} "
             f"pending={metrics.total_pending_tasks} active={metrics.total_active_tasks} "
             f"workers={metrics.alive_workers}/{metrics.total_workers} "
+            f"missing={metrics.missing_workers} "
             f"sat={metrics.saturation_pct:.0f}% max_age={lat} findings={len(findings)}"
         )
 

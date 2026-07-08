@@ -257,6 +257,8 @@ class APIClient:
                 "total_active": metrics.total_active_tasks,
                 "total_workers": metrics.total_workers,
                 "alive_workers": metrics.alive_workers,
+                "expected_workers": metrics.expected_workers,
+                "missing_workers": metrics.missing_workers,
                 "total_concurrency": metrics.total_concurrency,
                 "saturation_pct": round(metrics.saturation_pct, 2),
                 "max_latency_sec": metrics.max_latency_sec,
