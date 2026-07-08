@@ -334,3 +334,10 @@ class TestCmdInit:
             _run_main(["init", "--output", str(output)])
         out = capsys.readouterr().out
         assert str(output) in out
+
+    def test_mentions_local_mode(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "--local" in out

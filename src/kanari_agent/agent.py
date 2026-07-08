@@ -183,7 +183,10 @@ class KanariAgent:
                         action="Agent will continue collecting but metrics are not being sent",
                     )
         else:
-            self.logger.warning("No API key configured - metrics are only logged locally")
+            self.logger.warning(
+                "No API key configured — metrics are logged locally only. "
+                "Run 'kanari login' to enable alerts, or use --local to silence this warning."
+            )
             self._log_metrics_locally(metrics)
 
         return metrics

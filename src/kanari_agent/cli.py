@@ -121,6 +121,9 @@ thresholds:
     print("   Next steps:")
     print(f"   kanari doctor --config {output}  # verify connectivity first")
     print(f"   kanari audit  --config {output}  # one-shot health check")
+    print()
+    print("   No Kanari account yet? Run the agent in local mode:")
+    print(f"   kanari agent  --local --config {output}  # logs metrics to stdout, no API")
 
 
 def cmd_audit(args: argparse.Namespace) -> None:
