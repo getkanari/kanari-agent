@@ -10,7 +10,7 @@ import json as json_module
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from kanari_agent.config_checks import (  # noqa: F401 — re-exported for back-compat
     ConfigCheck,
@@ -245,7 +245,7 @@ def _print_json_output(
     findings: list[Any],
     system_status: Any,
     exit_code: int,
-    checks_performed: list[dict[str, str]] | None = None,
+    checks_performed: Optional[list[dict[str, str]]] = None,
 ) -> None:
     """Print JSON summary to stdout."""
     from kanari_agent.findings import top_findings
@@ -287,7 +287,7 @@ def _print_md_report(
     system_status: Any,
     config: Config,
     elapsed: float,
-    checks_performed: list[dict[str, str]] | None = None,
+    checks_performed: Optional[list[dict[str, str]]] = None,
 ) -> None:
     """Print Markdown report to stdout."""
     lines = [

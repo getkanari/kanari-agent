@@ -9,7 +9,7 @@ high prefetch, single-worker SPOF) that put queues at risk. Used by
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from kanari_agent.models import SystemMetrics
 
@@ -25,7 +25,7 @@ class ConfigCheck:
     name: str
     status: str  # "ok", "warning", "critical"
     message: str
-    recommendation: str | None = None
+    recommendation: Optional[str] = None
 
 
 def _run_config_checks(collector: Any, metrics: SystemMetrics) -> list[ConfigCheck]:

@@ -22,14 +22,15 @@ Design notes / known limitations:
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 
 class WorkerBaseline:
-    def __init__(self, grace_seconds: int = 90, auto_resolve_seconds: int | None = None):
+    def __init__(self, grace_seconds: int = 90, auto_resolve_seconds: Optional[int] = None):
         self.grace_seconds = grace_seconds
         self.auto_resolve_seconds = auto_resolve_seconds
         self.baseline = 0
-        self.gap_since: datetime | None = None
+        self.gap_since: Optional[datetime] = None
 
     def update(self, alive: int, now: datetime) -> tuple[int, int]:
         """Feed one cycle's alive-worker count; return (expected, missing)."""

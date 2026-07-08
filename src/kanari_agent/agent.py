@@ -7,6 +7,7 @@ from __future__ import annotations
 import signal
 import sys
 import time
+from typing import Optional
 
 from kanari_agent.api_client import APIClient
 from kanari_agent.collector import MetricsCollector, _redact_url
@@ -31,7 +32,7 @@ class KanariAgent:
         self.running = False
         self._consecutive_failures = 0
         self._max_consecutive_failures = 10
-        self.api_client: APIClient | None = None
+        self.api_client: Optional[APIClient] = None
 
         # Initialize API client only if not in local mode and API key provided
         if not config.local_mode and config.api_key:

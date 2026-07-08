@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from kanari_agent.config import AGENT_VERSION
 from kanari_agent.logger import StructuredLogger
@@ -31,9 +31,9 @@ class APIClient:
     def __init__(
         self,
         api_key: str,
-        api_url: str | None = None,
-        logger: StructuredLogger | None = None,
-        config: Config | None = None,
+        api_url: Optional[str] = None,
+        logger: Optional[StructuredLogger] = None,
+        config: Optional[Config] = None,
     ):
         self.api_key = api_key
         self.api_url = (api_url or self.DEFAULT_API_URL).rstrip("/")
@@ -136,8 +136,8 @@ class APIClient:
         }
 
     def _make_request(
-        self, method: str, endpoint: str, payload: dict | None = None
-    ) -> tuple[bool, dict | None]:
+        self, method: str, endpoint: str, payload: Optional[dict] = None
+    ) -> tuple[bool, Optional[dict]]:
         """Makes HTTP request to the API"""
         url = f"{self.api_url}{endpoint}"
 

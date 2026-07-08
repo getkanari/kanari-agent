@@ -8,7 +8,7 @@ import json
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from kanari_agent.logger import StructuredLogger
 from kanari_agent.models import Config, QueueMetrics, SystemMetrics, WorkerMetrics
@@ -44,11 +44,11 @@ INSPECT_TIMEOUT = 1.0
 class MetricsCollector:
     """Collects metrics from Redis and Celery"""
 
-    def __init__(self, config: Config, logger: StructuredLogger | None = None):
+    def __init__(self, config: Config, logger: Optional[StructuredLogger] = None):
         self.config = config
         self.logger = logger or StructuredLogger("kanari-collector")
-        self.redis_client: Any | None = None
-        self.celery_app: Any | None = None
+        self.redis_client: Optional[Any] = None
+        self.celery_app: Optional[Any] = None
         self._discovered_queues: list[str] = []
         self._worker_baseline = WorkerBaseline(
             grace_seconds=config.thresholds.worker_offline_grace_seconds,
@@ -183,7 +183,7 @@ class MetricsCollector:
             self.logger.error("Failed to get queue depth", queue=queue_name, error=str(e))
             return 0
 
-    def get_oldest_task_age(self, queue_name: str) -> tuple[float | None, str]:
+    def get_oldest_task_age(self, queue_name: str) -> tuple[Optional[float], str]:
         """
         Estimates the age of the oldest task in the queue.
 
@@ -299,7 +299,7 @@ class MetricsCollector:
             queues_to_monitor = self._discovered_queues
 
         # Track max latency across all queues
-        max_latency: float | None = None
+        max_latency: Optional[float] = None
 
         # Collect queue metrics
         for queue_name in queues_to_monitor:

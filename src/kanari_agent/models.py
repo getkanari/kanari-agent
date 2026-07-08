@@ -16,7 +16,7 @@ class AlertThresholds(BaseModel):
     max_wait_time_seconds: int = 60
     max_task_runtime_seconds: int = 1800  # 30 minutes
     worker_offline_grace_seconds: int = 90  # gap must persist this long before confirming
-    worker_auto_resolve_seconds: int | None = None  # None = fail loud (default)
+    worker_auto_resolve_seconds: Optional[int] = None  # None = fail loud (default)
     worker_heartbeat_timeout_seconds: int = 120
     critical_queues: list[str] = Field(default_factory=list)  # empty = none critical
 

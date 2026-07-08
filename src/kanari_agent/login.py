@@ -10,7 +10,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 POLL_INTERVAL_SEC = 3
 POLL_TIMEOUT_SEC = 300  # 5 minutes
@@ -43,7 +43,7 @@ def save_kanari_config(api_key: str, api_url: str) -> None:
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 
-def _post(url: str, data: dict, api_key: str | None = None, timeout: int = 10) -> dict[str, Any]:
+def _post(url: str, data: dict, api_key: Optional[str] = None, timeout: int = 10) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -146,8 +146,8 @@ def run_login(api_url: str) -> None:
 def run_alerts_configure(
     api_url: str,
     api_key: str,
-    slack_webhook: str | None,
-    alert_email: str | None,
+    slack_webhook: Optional[str],
+    alert_email: Optional[str],
 ) -> None:
     """POST /api/v1/settings/alerts to save alert channel config."""
     if not slack_webhook and not alert_email:
