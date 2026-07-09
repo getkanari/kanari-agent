@@ -1,11 +1,27 @@
-# Kanari Agent
+<p align="center">
+  <a href="https://getkanari.com/?utm_source=github&utm_medium=logo" target="_blank">
+    <img src="https://getkanari.com/logo.png" alt="Kanari" width="300" />
+    <h3 align="center">Kanari</h3>
+  </a>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/kanari.svg)](https://pypi.org/project/kanari/)
+<p align="center">
+  Privacy-first monitoring agent for Celery + Redis.
+</p>
+
+<p align="center">
+  <a href="https://doorman.mintlify.app/docs/introduction"><strong>Documentation</strong></a>
+  <!-- <a href="https://getkanari.com/changelog"><strong>Changelog</strong></a> · -->
+  <!-- <a href="https://getkanari.com/docs/cli"><strong>CLI</strong></a> -->
+</p>
+<br/>
+
+[![X Follow](https://img.shields.io/twitter/follow/getkanaricom?label=Kanari&style=social)](https://x.com/intent/follow?screen_name=getkanaricom)
+[![PyPi page link -- version](https://img.shields.io/pypi/v/kanari.svg)](https://pypi.org/project/kanari/)
 [![Python versions](https://img.shields.io/pypi/pyversions/kanari.svg)](https://pypi.org/project/kanari/)
-[![Tests](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/getkanari/kanari-agent/blob/master/LICENSE)
 
-Monitoring agent for Celery + Redis queues. One command to know if your workers are healthy, your queues are draining, and your tasks aren't stuck.
 
 ```bash
 pip install kanari
