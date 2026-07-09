@@ -11,7 +11,7 @@ from typing import Optional
 from kanari_agent.models import AlertThresholds, Config, PrivacyConfig
 
 try:
-    AGENT_VERSION = version("kanari-agent")
+    AGENT_VERSION = version("kanari")
 except PackageNotFoundError:
     AGENT_VERSION = "0.1.0"  # fallback for dev installs
 
