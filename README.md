@@ -1,14 +1,14 @@
 # Kanari Agent
 
-[![PyPI version](https://img.shields.io/pypi/v/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
-[![Python versions](https://img.shields.io/pypi/pyversions/kanari-agent.svg)](https://pypi.org/project/kanari-agent/)
+[![PyPI version](https://img.shields.io/pypi/v/kanari.svg)](https://pypi.org/project/kanari/)
+[![Python versions](https://img.shields.io/pypi/pyversions/kanari.svg)](https://pypi.org/project/kanari/)
 [![Tests](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Monitoring agent for Celery + Redis queues. One command to know if your workers are healthy, your queues are draining, and your tasks aren't stuck.
 
 ```bash
-pip install kanari-agent
+pip install kanari
 kanari audit
 ```
 
@@ -88,7 +88,7 @@ Audit completed in 1.3s
 **1. Install**
 
 ```bash
-pip install kanari-agent
+pip install kanari
 ```
 
 **2. Generate a config file**
@@ -329,7 +329,7 @@ kanari audit --json | python3 -m json.tool
     REDIS_URL: ${{ secrets.REDIS_URL }}
     CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
   run: |
-    pip install kanari-agent
+    pip install kanari
     kanari audit --json
 ```
 

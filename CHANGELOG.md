@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **PyPI package renamed from `kanari-agent` to `kanari`** — install with `pip install kanari`. The Python module (`import kanari_agent`) and CLI command (`kanari`) are unchanged.
+
+---
+
 ## [0.2.0] — 2026-07-08
 
 ### Added

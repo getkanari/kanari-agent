@@ -125,7 +125,7 @@ sudo systemctl enable --now kanari-agent
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install kanari-agent
+RUN pip install kanari
 CMD ["kanari", "agent", "--local"]
 ```
 
@@ -142,7 +142,7 @@ docker run -e REDIS_URL=redis://your-redis:6379/0 \
 services:
   kanari:
     image: python:3.12-slim
-    command: sh -c "pip install kanari-agent && kanari agent"
+    command: sh -c "pip install kanari && kanari agent"
     environment:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0

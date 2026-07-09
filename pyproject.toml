@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "kanari-agent"
+name = "kanari"
 version = "0.2.0"
 description = "Privacy-first monitoring agent for Celery + Redis"
 authors = ["Hernán Chilabert <hchilabert@gmail.com>"]
@@ -45,7 +45,6 @@ detect-secrets = ">=1.4"
 git-cliff = "^2.13.1"
 
 [tool.poetry.scripts]
-kanari-agent = "kanari_agent.cli:main"
 kanari = "kanari_agent.cli:main"
 
 [build-system]
