@@ -40,7 +40,7 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install kanari-agent
+          pip install kanari
           kanari audit --json
 ```
 
@@ -58,7 +58,7 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install kanari-agent
+          pip install kanari
           kanari audit --json
           if [ $? -eq 2 ]; then
             echo "❌ Celery is in CRITICAL state. Aborting deploy."
@@ -90,7 +90,7 @@ Check that Celery is still healthy after deploying.
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
         run: |
-          pip install kanari-agent
+          pip install kanari
           kanari audit --json
 ```
 

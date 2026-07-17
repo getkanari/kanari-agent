@@ -4,6 +4,7 @@ Tests for kanari_agent.cli module (subcommand-based CLI)
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,6 +38,21 @@ class TestNoSubcommand:
         with pytest.raises(SystemExit) as exc:
             _run_main([])
         assert exc.value.code == 0
+
+    def test_no_subcommand_shows_quick_start(self, capsys):
+        with pytest.raises(SystemExit):
+            _run_main([])
+        out = capsys.readouterr().out
+        assert "kanari init" in out
+        assert "kanari doctor" in out
+        assert "kanari audit" in out
+        assert "kanari agent --local" in out
+
+    def test_no_subcommand_shows_version(self, capsys):
+        with pytest.raises(SystemExit):
+            _run_main([])
+        out = capsys.readouterr().out
+        assert "Kanari" in out
 
     def test_version_flag_exits(self):
         with pytest.raises(SystemExit) as exc:
@@ -121,6 +137,50 @@ class TestCliAudit:
                 _run_main(["audit"])
         assert exc.value.code == 2
 
+    def test_audit_without_config_and_no_kanari_yaml_prints_hint(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        monkeypatch.chdir(tmp_path)  # cwd has no kanari.yaml
+        cfg = Config()
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit"])
+        out = capsys.readouterr().out
+        assert "kanari init" in out
+
+    def test_audit_without_config_but_kanari_yaml_exists_shows_using_hint(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        (tmp_path / "kanari.yaml").write_text("redis_url: redis://localhost:6379/0\n")
+        monkeypatch.chdir(tmp_path)
+        cfg = Config()
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit"])
+        out = capsys.readouterr().out
+        assert "Using kanari.yaml" in out
+        assert "kanari init" not in out
+
+    def test_audit_with_explicit_config_skips_hints(self, tmp_path: Path, capsys):
+        cfg = Config()
+        config_file = tmp_path / "prod.yaml"
+        config_file.write_text("redis_url: redis://localhost:6379/0\n")
+        with (
+            patch("kanari_agent.config.load_config", return_value=cfg),
+            patch("kanari_agent.audit.run_audit", return_value=0),
+        ):
+            with pytest.raises(SystemExit):
+                _run_main(["audit", "--config", str(config_file)])
+        out = capsys.readouterr().out
+        assert "kanari init" not in out
+        assert "Using" not in out
+
 
 # ---------------------------------------------------------------------------
 # kanari watch
@@ -194,3 +254,109 @@ class TestCliAgent:
             _run_main(["agent", "--token", "my-secret-key", "--local"])
 
         mock_agent.run.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# kanari init
+# ---------------------------------------------------------------------------
+
+
+class TestCmdInit:
+    def test_creates_config_yaml_in_tmp(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        assert output.exists()
+
+    def test_output_contains_required_keys(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        content = output.read_text()
+        for key in ("redis_url", "celery_broker_url", "celery_app_name", "thresholds"):
+            assert key in content
+
+    def test_output_is_valid_yaml(self, tmp_path: Path):
+        import yaml
+
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        data = yaml.safe_load(output.read_text())
+        assert isinstance(data, dict)
+        assert "redis_url" in data
+
+    def test_exits_1_if_file_exists_without_force(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        output.write_text("existing content")
+        with pytest.raises(SystemExit) as exc:
+            _run_main(["init", "--output", str(output)])
+        assert exc.value.code == 1
+        assert output.read_text() == "existing content"
+
+    def test_force_overwrites_existing_file(self, tmp_path: Path):
+        output = tmp_path / "config.yaml"
+        output.write_text("old content")
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output), "--force"])
+        assert output.read_text() != "old content"
+        assert "redis_url" in output.read_text()
+
+    def test_default_output_filename(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init"])
+        assert (tmp_path / "kanari.yaml").exists()
+
+    def test_uses_redis_url_env_var(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("REDIS_URL", "redis://myhost:6379/2")
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        content = output.read_text()
+        assert "redis://myhost:6379/2" in content
+
+    def test_uses_celery_broker_url_env_var(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("CELERY_BROKER_URL", "redis://broker:6379/3")
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        content = output.read_text()
+        assert "redis://broker:6379/3" in content
+
+    def test_shows_redis_detected_when_reachable(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=True):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "Redis detected" in out
+
+    def test_shows_redis_warning_when_unreachable(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "not reachable" in out
+
+    def test_prints_doctor_before_audit_in_hint(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "doctor" in out
+        assert "audit" in out
+        assert out.index("doctor") < out.index("audit")
+
+    def test_hint_includes_config_path(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert str(output) in out
+
+    def test_mentions_local_mode(self, tmp_path: Path, capsys):
+        output = tmp_path / "config.yaml"
+        with patch("kanari_agent.cli._probe_redis", return_value=False):
+            _run_main(["init", "--output", str(output)])
+        out = capsys.readouterr().out
+        assert "--local" in out

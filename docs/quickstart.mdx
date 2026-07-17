@@ -14,19 +14,29 @@ description: From install to your first health check in under 2 minutes
 ## 1. Install
 
 ```bash
-pip install kanari-agent
+pip install kanari
 ```
 
 ---
 
-## 2. Point to your infrastructure
+## 2. Generate a config file
 
 ```bash
-export REDIS_URL=redis://your-redis:6379/0
-export CELERY_BROKER_URL=redis://your-redis:6379/0
+kanari init
 ```
 
-If Redis is on localhost with default settings, skip this — those are already the defaults.
+This creates `kanari.yaml` in the current directory with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_URL` are already set in your environment, those values are written into the file automatically. The command also pings Redis and reports whether it's reachable:
+
+```
+✅ Created kanari.yaml
+   Redis detected at redis://localhost:6379/0
+
+   Next steps:
+   kanari doctor        # verify connectivity first
+   kanari audit         # one-shot health check
+```
+
+Open `kanari.yaml` and update `redis_url` / `celery_broker_url` if needed, then continue.
 
 ---
 
@@ -36,9 +46,9 @@ If Redis is on localhost with default settings, skip this — those are already 
 kanari doctor
 ```
 
-This checks that the required libraries are installed, Redis is reachable, and your Celery workers are responding. If anything is wrong, it tells you exactly how to fix it.
+Checks that the required libraries are installed, Redis is reachable, and your Celery workers are responding. If anything is wrong, it tells you exactly how to fix it. Automatically loads `kanari.yaml` if it's in the current directory.
 
-If everything is green, move on. If not, fix what `doctor` reports before running `audit`.
+Fix what `doctor` reports before running `audit`.
 
 ---
 
@@ -81,6 +91,8 @@ Audit completed in 1.2s
 ```
 
 That's it for local monitoring. No account, no external service beyond what you already have.
+
+> **Tip:** If `kanari.yaml` is in your current directory, all commands load it automatically — no `--config` flag needed. If the file is somewhere else, use `kanari audit --config /path/to/kanari.yaml`.
 
 ---
 

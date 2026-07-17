@@ -129,6 +129,14 @@ def _check_config_file(path: Optional[str]) -> CheckResult:
         from kanari_agent.config import load_config
 
         load_config(path)
+        overrides = [v for v in ("REDIS_URL", "CELERY_BROKER_URL") if os.environ.get(v)]
+        if overrides:
+            return CheckResult(
+                label,
+                Status.OK,
+                f"Loaded: {path}",
+                fix=f"Note: {', '.join(overrides)} env var(s) override values in this file",
+            )
         return CheckResult(label, Status.OK, f"Loaded: {path}")
     except Exception as exc:
         return CheckResult(
@@ -222,9 +230,14 @@ def run_doctor(config_path: Optional[str] = None, no_color: bool = False) -> int
     """Run all diagnostic checks. Returns 0 if all pass/warn, 1 if any fail."""
     import os
 
-    from kanari_agent.config import load_config
+    from kanari_agent.config import DEFAULT_CONFIG_FILENAME, load_config
 
     use_color = not no_color and sys.stdout.isatty()
+
+    # Resolve the effective config path (mirrors load_config auto-discovery)
+    resolved_path = config_path
+    if resolved_path is None and os.path.exists(DEFAULT_CONFIG_FILENAME):
+        resolved_path = DEFAULT_CONFIG_FILENAME
 
     # Best-effort config load — fall back to env/defaults if it fails
     try:
@@ -248,7 +261,7 @@ def run_doctor(config_path: Optional[str] = None, no_color: bool = False) -> int
         _check_redis_lib(),
         _check_celery_lib(),
         _check_yaml_lib(),
-        _check_config_file(config_path),
+        _check_config_file(resolved_path),
         _check_redis(redis_url),
         _check_celery_workers(broker_url, app_name),
         _check_api_key(api_key),

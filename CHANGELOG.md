@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.0] — 2026-07-10
+
+### Added
+- Show guided quick-start when running kanari with no subcommand
+- Suggest kanari doctor before audit in post-init hint
+- Show localhost-defaults hint when no --config is given
+- Auto-detect REDIS_URL/CELERY_BROKER_URL env vars and probe Redis
+- Surface --local mode in init output and agent no-key warning
+- Rename default output from config.yaml to kanari.yaml
+- Auto-discover kanari.yaml from cwd — no --config needed
+- Rename PyPI distribution from kanari-agent to kanari
+- Add kanari.yaml and kanari.yml to .gitignore; update README for improved branding and documentation links
+
+### Fixed
+- Doctor and config tests respect kanari.yaml auto-discovery
+- Warn when env vars override kanari.yaml values
+
+---
+
 ## [0.2.0] — 2026-07-09
 
 ### Changed

@@ -25,9 +25,20 @@ except ImportError:
     YAML_AVAILABLE = False
 
 
+DEFAULT_CONFIG_FILENAME = "kanari.yaml"
+
+
 def load_config(config_path: Optional[str] = None) -> Config:
-    """Loads configuration from YAML file or environment variables"""
+    """Loads configuration from YAML file or environment variables.
+
+    If config_path is None, looks for kanari.yaml in the current directory
+    before falling back to built-in defaults.
+    """
     config_data: dict = {}
+
+    # Auto-discover kanari.yaml in the current working directory
+    if config_path is None and os.path.exists(DEFAULT_CONFIG_FILENAME):
+        config_path = DEFAULT_CONFIG_FILENAME
 
     # Load from YAML file if it exists
     if config_path and os.path.exists(config_path):
@@ -77,7 +88,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
                     privacy_data["sanitize_task_signatures"] = p["sanitize_task_signatures"]
                 config_data["privacy"] = PrivacyConfig(**privacy_data)
 
-    # ~/.kanari/config (written by kanari login) overrides config.yaml
+    # ~/.kanari/config (written by kanari login) overrides kanari.yaml
     from kanari_agent.login import load_kanari_config
 
     kanari_cfg = load_kanari_config()

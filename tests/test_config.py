@@ -14,7 +14,11 @@ from kanari_agent.models import AlertThresholds, Config
 # Fixture to clean environment variables and ~/.kanari/config before each test
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch, tmp_path):
-    """Remove all kanari-related env vars and isolate ~/.kanari/config before each test"""
+    """Remove all kanari-related env vars and isolate ~/.kanari/config before each test.
+
+    Also changes cwd to tmp_path so that auto-discovery of kanari.yaml in the
+    project root does not bleed into tests that expect built-in defaults.
+    """
     env_vars = [
         "KANARI_API_KEY",
         "KANARI_API_URL",
@@ -25,6 +29,9 @@ def clean_env(monkeypatch, tmp_path):
     ]
     for var in env_vars:
         monkeypatch.delenv(var, raising=False)
+
+    # Isolate cwd so auto-discovery doesn't pick up the project-level kanari.yaml
+    monkeypatch.chdir(tmp_path)
 
     # Point KANARI_CONFIG_PATH to a non-existent temp path so real ~/.kanari/config
     # doesn't bleed into tests that expect default values
@@ -297,3 +304,33 @@ def test_worker_knobs_env_override(tmp_path, monkeypatch):
     cfg = load_config(None)
     assert cfg.thresholds.worker_offline_grace_seconds == 10
     assert cfg.thresholds.worker_auto_resolve_seconds == 600
+
+
+# ---------------------------------------------------------------------------
+# Auto-discovery of kanari.yaml in current working directory
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_auto_discovers_kanari_yaml(tmp_path, monkeypatch):
+    """load_config(None) should load kanari.yaml from cwd if it exists."""
+    (tmp_path / "kanari.yaml").write_text("redis_url: redis://auto-host:6379/0\n")
+    monkeypatch.chdir(tmp_path)
+    cfg = load_config(None)
+    assert cfg.redis_url == "redis://auto-host:6379/0"
+
+
+def test_load_config_no_auto_discovery_when_file_absent(tmp_path, monkeypatch):
+    """load_config(None) falls back to defaults when kanari.yaml is absent."""
+    monkeypatch.chdir(tmp_path)
+    cfg = load_config(None)
+    assert cfg.redis_url == "redis://localhost:6379/0"
+
+
+def test_explicit_config_path_takes_priority_over_auto_discovery(tmp_path, monkeypatch):
+    """Explicit --config path overrides kanari.yaml in cwd."""
+    (tmp_path / "kanari.yaml").write_text("redis_url: redis://from-kanari-yaml:6379/0\n")
+    explicit = tmp_path / "explicit.yaml"
+    explicit.write_text("redis_url: redis://from-explicit:6379/0\n")
+    monkeypatch.chdir(tmp_path)
+    cfg = load_config(str(explicit))
+    assert cfg.redis_url == "redis://from-explicit:6379/0"
