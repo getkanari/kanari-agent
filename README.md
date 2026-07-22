@@ -1,8 +1,6 @@
 <p align="center">
-  <a href="https://getkanari.com/?utm_source=github&utm_medium=logo" target="_blank">
-    <img src="https://getkanari.com/logo.png" alt="Kanari" width="300" />
-    <h3 align="center">Kanari</h3>
-  </a>
+  <img src="assets/logo.png" alt="Kanari" width="300" />
+  <h3 align="center">Kanari</h3>
 </p>
 
 <p align="center">
@@ -10,372 +8,277 @@
 </p>
 
 <p align="center">
-  <a href="https://doorman.mintlify.app/docs/introduction"><strong>Documentation</strong></a>
-  <!-- <a href="https://getkanari.com/changelog"><strong>Changelog</strong></a> · -->
-  <!-- <a href="https://getkanari.com/docs/cli"><strong>CLI</strong></a> -->
+  <a href="docs/introduction.mdx"><strong>Documentation</strong></a>
 </p>
 <br/>
 
-[![X Follow](https://img.shields.io/twitter/follow/getkanaricom?label=Kanari&style=social)](https://x.com/intent/follow?screen_name=getkanaricom)
-[![PyPi page link -- version](https://img.shields.io/pypi/v/kanari.svg)](https://pypi.org/project/kanari/)
+[![PyPI version](https://img.shields.io/pypi/v/kanari.svg)](https://pypi.org/project/kanari/)
 [![Python versions](https://img.shields.io/pypi/pyversions/kanari.svg)](https://pypi.org/project/kanari/)
 [![CI](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/getkanari/kanari-agent/actions/workflows/tests.yml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/getkanari/kanari-agent/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
+## Problem addressed
+
+A running Celery process does not guarantee that queued work is making progress.
+
+Kanari combines Celery worker state with Redis queue depth, task wait time when timestamps
+are available, active-task runtime, and relevant configuration. It reports conditions that
+can block or delay background work and includes the evidence used to produce each finding.
+
+Kanari checks:
+
+- Redis and Celery connectivity
+- Worker availability, active tasks, concurrency, and pool saturation
+- Queue depth and the age of the oldest queued task
+- Active tasks that exceed a configured runtime
+- Celery acknowledgment and prefetch settings
+- Redis memory, eviction, and persistence settings when configuration access is available
+
+### Scope and limitations
+
+- Queue inspection currently supports Celery with Redis as the broker.
+- Queue wait time requires a timestamp in the queued message. Kanari can add one with
+  `KanariStampPlugin`.
+- A one-shot audit has no previous worker baseline. If one worker disappears while others remain,
+  the audit may only observe the current worker count.
+- Kanari reports execution-layer conditions. It does not determine whether a task result or a
+  business operation is correct.
+- Configuration checks that require Redis `CONFIG` or Celery `inspect conf` are skipped when the
+  connected user does not have permission.
+
+## Requirements
+
+- Python 3.9–3.12 (tested in CI)
+- Celery 5.2+
+- Redis as the Celery broker
+
+## Quick start
 
 ```bash
 pip install kanari
+kanari init
+kanari doctor
 kanari audit
 ```
 
-No account needed. No external service. Point it at your Redis and get a full health report in seconds.
+`kanari init` writes `kanari.yaml`. `doctor`, `audit`, `watch`, and `agent` automatically
+load that file from the current directory. The local commands do not require an account and do
+not contact the Kanari API.
 
----
+### Example output
 
-## Why Kanari?
+The following is an abridged audit with `payments` configured as a critical queue:
 
-**Your workers show as running. Your queue keeps growing. Nobody knows why.**
+```text
+$ kanari audit
 
-This is the most common Celery production problem — and the hardest to debug with generic monitoring tools. Datadog and Grafana can tell you CPU and memory, but they don't understand Celery's queue model, worker pool, or task acknowledgment semantics.
-
-Kanari is built specifically for Celery shops. It knows:
-
-- **Ghost workers** — workers that are alive but stopped consuming after a Redis reconnect
-- **Queue latency** — how long the oldest task has been waiting (not just queue depth)
-- **Stuck tasks** — tasks running beyond your threshold that are blocking worker slots
-- **Silent task loss** — configurations (`task_acks_late=False`) that drop tasks on worker crash
-- **Capacity headroom** — how close you are to saturation before new tasks start queuing
-
-```
 🔍 Kanari Audit
 ════════════════════════════════════════════════════════════
 
-✅ System: HEALTHY
+❌ System: CRITICAL
 
 Infrastructure
   ✅ Redis: connected
   ✅ Celery: connected (4 workers)
 
 Workers
-  Status   Worker       Slots   Note
-  ✅       api-worker   2/8     online
-  ✅       email-wrk    1/4     online
-  ⚠️       job-worker   4/4     at capacity
-  ❌       beat-wrk     0/4     offline
+  Status   Worker        Slots   Note
+  ✅       api-worker    2/8     online
+  ❌       payment-wrk   0/4     offline
 
 Queues
-  Status   Queue          Pending   Latency    Trend
-  ✅       celery         3         1.2s
-  ✅       default        0         0s         →
-  🔥       emails         847       125.4s     ↑+203
-  ✅       notifications  12        4.8s
+  Status   Queue       Pending   Latency
+  🔥       payments       1847     125.4s
 
-Metrics
-  📊 Saturation: 43.8% (7/16 slots, headroom: 9 slots)
-  ⏱️  Max Latency: 125.4s (emails)
-  📋 Total Pending: 862 tasks
-
-════════════════════════════════════════════════════════════
 Findings
-  [CRITICAL]   WORKER_OFFLINE           Worker offline: beat-wrk
-  [HIGH]       QUEUE_SLA_BREACH_EMAILS  SLA breach on queue 'emails'
-  [HIGH]       QUEUE_BACKLOG_EMAILS     Queue 'emails' backlog: 847 tasks pending
-
-💡 Recommendations:
-  • Restart worker: celery -A your_app worker --hostname=beat-wrk
-  • Scale workers for 'emails' queue (847 pending, 125.4s latency)
+  [CRITICAL]  WORKER_OFFLINE          Worker offline: payment-wrk
+  [HIGH]      QUEUE_SLA_BREACH_PAYMENTS
+  [HIGH]      QUEUE_BACKLOG_PAYMENTS
 
 ❌ Critical issues found
-Audit completed in 1.3s
 ```
 
----
+The report relates findings to the collected worker and queue metrics. The JSON format includes
+an evidence summary for each top finding. Configuration warnings include candidate remediation
+steps.
 
-## Requirements
+## Local commands
 
-- Python 3.9+
-- Redis
-- Celery 5.2+
+| Command | Purpose |
+|---------|---------|
+| [`kanari init`](docs/commands/init.mdx) | Generate a `kanari.yaml` file and probe Redis |
+| [`kanari doctor`](docs/commands/doctor.mdx) | Check libraries, configuration, Redis, and Celery connectivity |
+| [`kanari audit`](docs/commands/audit.mdx) | Run a one-shot assessment and exit with a status code |
+| [`kanari watch`](docs/commands/watch.mdx) | Re-run the assessment on a refresh interval |
+| [`kanari agent --local`](docs/commands/agent.mdx) | Collect continuously and write structured records to stdout |
 
----
-
-## Quick Start
-
-**1. Install**
+Common audit formats:
 
 ```bash
-pip install kanari
+kanari audit                  # terminal report
+kanari audit --json           # machine-readable summary
+kanari audit --md             # Markdown summary
+kanari audit --no-config-checks
+kanari audit --config /etc/kanari/prod.yaml
 ```
 
-**2. Generate a config file**
-
-```bash
-kanari init
-```
-
-Creates `kanari.yaml` with sensible defaults. If `REDIS_URL` or `CELERY_BROKER_URL` are set in your environment, they're picked up automatically. The command also pings Redis and tells you whether it's reachable.
-
-**3. Verify your setup**
-
-```bash
-kanari doctor
-```
-
-Checks that Redis is reachable, Celery workers are responding, and all required libraries are installed. Tells you exactly what to fix if something is wrong. Auto-loads `kanari.yaml` from the current directory.
-
-**4. Run a health check**
-
-```bash
-kanari audit
-```
-
-That's it. No account, no API key, no external dependencies beyond Redis and Celery.
-
-> **Tip:** All commands auto-load `kanari.yaml` from the current directory. Use `--config /path/to/file.yaml` only when the file lives somewhere else.
-
----
-
-## Commands
-
-### `kanari init`
-
-Generate a starter `kanari.yaml` with sensible defaults. Reads `REDIS_URL` and `CELERY_BROKER_URL` from the environment if set, and probes Redis to confirm connectivity.
-
-```bash
-kanari init                        # creates kanari.yaml in the current directory
-kanari init --output /etc/kanari/kanari.yaml  # custom path
-kanari init --force                # overwrite existing file
-```
-
-### `kanari doctor`
-
-Diagnose your setup before running anything else. Checks Python version, required libraries, Redis connectivity, Celery workers, and API key format.
-
-```bash
-kanari doctor                              # auto-loads kanari.yaml if present
-kanari doctor --config /etc/kanari/prod.yaml  # explicit path
-```
-
-Returns exit code `0` if everything passes (or only warnings), `1` if any check fails.
-
-### `kanari audit`
-
-One-shot health check. Prints a report and exits with a status code.
-
-```bash
-kanari audit                             # auto-loads kanari.yaml; rich TUI report + config analysis
-kanari audit --json                      # machine-readable JSON (for CI/scripts)
-kanari audit --md                        # Markdown report
-kanari audit --no-config-checks         # skip config analysis (e.g. restricted Redis)
-kanari audit --config /etc/kanari/prod.yaml  # explicit config path
-```
-
-Configuration analysis (acks_late, eviction policy, prefetch, and more) runs on every audit. On a healthy system the report shows a `✓ N checks passed` summary of everything verified. The JSON output includes a `checks_performed` array for CI assertions.
-
-**Exit codes** — integrate directly into CI/CD:
+### Exit codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | Healthy |
-| `1` | Warnings |
-| `2` | Critical |
+| `0` | No findings or configuration warnings |
+| `1` | Warning-level findings or configuration warnings |
+| `2` | Degraded or critical state, including `HIGH` and `CRITICAL` findings |
 
-```bash
-kanari audit --json
-if [ $? -eq 2 ]; then
-  echo "Critical Celery issues found — paging on-call"
-  exit 1
-fi
-```
+## Queue latency
 
-### `kanari watch`
+Celery messages in a Redis queue do not normally include a reliable publication timestamp.
+Without one, Kanari reports queue depth but cannot determine how long the oldest task has waited.
+Worker, active-task, saturation, and configuration checks continue to run.
 
-Live dashboard that clears and refreshes periodically. Useful when debugging an incident.
-
-```bash
-kanari watch                # refreshes every 5s
-kanari watch --interval 10  # refreshes every 10s
-kanari watch --deep         # includes config analysis on each refresh
-```
-
-### `kanari agent`
-
-Continuous monitoring loop. Runs until stopped. In local mode it logs structured JSON; in API mode it sends metrics to api.getkanari.com.
-
-```bash
-kanari agent --local                             # log only, no API (auto-loads kanari.yaml)
-kanari agent --token your-api-key                # sends metrics to api.getkanari.com
-kanari agent --config /etc/kanari/prod.yaml      # explicit config path
-```
-
----
-
-## Enable Latency Tracking
-
-By default, Celery + Redis doesn't timestamp tasks when they're queued. Without timestamps, Kanari can't measure how long tasks wait — it can only see queue depth.
-
-Add one line to your Celery app to unlock accurate latency:
+Install the timestamp hook in the process that publishes tasks:
 
 ```python
 from celery import Celery
 from kanari_agent.stamps import KanariStampPlugin
 
 app = Celery(...)
-KanariStampPlugin.install(app)  # adds kanari_sent_ts header to every task
+KanariStampPlugin.install(app)
 ```
 
-After this, `kanari audit` shows real wait times per queue and triggers `QUEUE_SLA_BREACH` findings when tasks wait longer than your configured threshold.
+The hook adds a `kanari_sent_ts` header before each task is published. Only tasks published after
+the hook is installed have this timestamp.
 
-> **Note:** Only tasks published _after_ installing the plugin will have timestamps. Tasks already in the queue will show `latency: unknown` until they're consumed and new ones are enqueued.
-
----
+See [Queue latency tracking](docs/guides/latency-tracking.mdx) for details.
 
 ## Configuration
 
-Kanari uses two separate config files with different purposes:
+Kanari reads runtime configuration from two locations:
 
-| File | Purpose | Written by | Contains secrets? | Commit to git? |
-|------|---------|-----------|-------------------|----------------|
-| `kanari.yaml` | What to monitor (URLs, thresholds, queues) | `kanari init` / you | No | ✅ Yes |
-| `~/.kanari/config` | Who you are (API key) | `kanari login` | Yes | ❌ Never |
+| File | Purpose | Security note |
+|------|---------|---------------|
+| `kanari.yaml` | Redis/Celery URLs, queues, and local finding thresholds | May contain credentials in connection URLs; commit only a secret-free version |
+| `~/.kanari/config` | API key and API URL written by `kanari login` | Contains secrets; do not commit |
 
-### Environment variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `REDIS_URL` | Redis connection URL | `redis://localhost:6379/0` |
-| `CELERY_BROKER_URL` | Celery broker URL | same as `REDIS_URL` |
-| `KANARI_API_KEY` | API key for `kanari agent` API mode | — |
-| `KANARI_LOCAL_MODE` | `true` to disable API calls | `false` |
-| `CHECK_INTERVAL` | Seconds between checks (agent mode) | `30` |
-
-### Config file (optional)
+A minimal local configuration:
 
 ```yaml
-# redis and celery connections
 redis_url: redis://prod-redis:6379/1
 celery_broker_url: redis://prod-redis:6379/1
 
-# check interval in agent mode
-check_interval_seconds: 15
-
-# leave empty to auto-discover queues from workers
+# Empty means: discover queues through Celery inspect active_queues.
 monitored_queues: []
 
-# alert thresholds
+# These thresholds control local findings.
 thresholds:
-  max_queue_size: 1000          # tasks — triggers QUEUE_BACKLOG finding
-  max_wait_time_seconds: 60     # seconds — triggers QUEUE_SLA_BREACH finding
-  max_task_runtime_seconds: 1800  # 30 min — triggers STUCK_TASK finding
-  critical_queues:              # these get HIGH severity (vs MEDIUM) on backlog
-    - emails
+  max_queue_size: 1000
+  max_wait_time_seconds: 60
+  max_task_runtime_seconds: 1800
+  critical_queues:
     - payments
-
-# privacy: set false only if task names contain no PII
-privacy:
-  sanitize_task_signatures: true
 ```
 
-```bash
-kanari audit
-```
-
----
+`REDIS_URL` and `CELERY_BROKER_URL` override values from `kanari.yaml`. See the
+[configuration reference](docs/reference/configuration.mdx) for the full precedence and field list.
 
 ## Findings
 
-Kanari doesn't just show metrics — it tells you what's wrong and how to fix it. Each finding includes the probable cause, commands to confirm it, and a safe fix.
+A finding records severity, observed evidence, probable causes, confirmation steps, and candidate
+remediation. Kanari does not execute remediation automatically.
 
-| Finding | Severity | What it means |
-|---------|----------|---------------|
-| `REDIS_DOWN` | CRITICAL | Cannot connect to Redis — no queue metrics available |
-| `NO_WORKERS` | CRITICAL | No Celery workers responding — tasks queue indefinitely |
-| `WORKER_OFFLINE` | CRITICAL | A specific worker stopped responding |
-| `STUCK_TASK` | HIGH | A task has been running longer than `max_task_runtime_seconds` |
-| `QUEUE_BACKLOG_*` | HIGH/MEDIUM | Queue depth exceeds `max_queue_size` |
-| `QUEUE_SLA_BREACH_*` | HIGH | Oldest task waiting longer than `max_wait_time_seconds` |
-| `LATENCY_UNAVAILABLE` | MEDIUM | No timestamps in queue — install `KanariStampPlugin` |
-| `HIGH_SATURATION` | MEDIUM | Worker pool above 80% utilization |
+| Finding | Default severity | Trigger |
+|---------|------------------|---------|
+| `REDIS_DOWN` | CRITICAL | Redis is unavailable during an established monitoring session |
+| `NO_WORKERS` | CRITICAL | Celery is unavailable or no workers respond |
+| `WORKER_OFFLINE` | CRITICAL | A worker appears in inspect data but does not return worker stats |
+| `STUCK_TASK` | HIGH | An active task exceeds `max_task_runtime_seconds` |
+| `QUEUE_BACKLOG_*` | HIGH/MEDIUM | Queue depth exceeds `max_queue_size`; critical queues use HIGH |
+| `QUEUE_SLA_BREACH_*` | HIGH | Oldest queued task exceeds `max_wait_time_seconds` |
+| `LATENCY_UNAVAILABLE` | MEDIUM | A non-empty queue has no usable timestamp |
+| `HIGH_SATURATION` | MEDIUM | Active tasks exceed 80% of reported concurrency |
 
----
+See the [findings reference](docs/reference/findings.mdx) for evidence fields and confirmation steps.
 
-## Configuration Analysis
+## Configuration analysis
 
-Every `kanari audit` inspects your Redis and Celery configuration for common production misconfigurations (`--deep` is no longer needed and is kept only as a deprecated no-op):
+`kanari audit` attempts these checks on every run:
 
-| Check | Risk if wrong |
-|-------|---------------|
-| Redis `maxmemory` not set | OOM kill wipes your queue |
-| Redis eviction policy `noeviction` | Writes fail silently when Redis is full |
-| Redis persistence disabled | Tasks lost on Redis restart |
-| `task_acks_late = False` | Tasks lost if worker crashes mid-execution |
-| `task_reject_on_worker_lost = False` | Silent task loss on sudden worker death |
-| `worker_prefetch_multiplier > 1` | Uneven task distribution, fast tasks stuck behind slow ones |
-| Single worker running | Single point of failure — one crash = full outage |
+| Check | Condition reported |
+|-------|--------------------|
+| Redis `maxmemory` | No limit is configured, or observed usage exceeds 80% of the configured limit |
+| Redis eviction policy | `noeviction` will reject writes after the memory limit is reached |
+| Redis persistence | The Redis `save` setting has no RDB snapshot schedule |
+| `task_acks_late` | Early acknowledgment can lose an in-progress task if its worker exits |
+| `task_reject_on_worker_lost` | Acknowledgment behavior can lose a task when a worker child exits unexpectedly |
+| `worker_prefetch_multiplier` | Values above 1 can cause uneven distribution for long-running tasks |
+| Worker redundancy | Only one worker is currently responding |
 
----
+These checks describe risk; they do not prove that data loss or an outage has occurred. If the
+connected Redis or Celery user cannot read configuration, unavailable checks are omitted rather
+than reported as passing.
 
-## Privacy
+## Data and privacy model
 
-The agent never accesses task arguments, results, or payloads. All metadata that could contain PII is sanitized before it leaves your infrastructure:
+Local commands and API mode handle identifiers differently:
 
-| Data | Original | What Kanari sees |
-|------|----------|-------------------|
-| Worker hostname | `celery@prod-worker-1.internal` | `w-a1b2c3d4` |
-| Task ID | `550e8400-e29b-41d4-a716-446655440000` | `t-8f3a2b1c4d5e` |
-| Task name | `process_user_98765` | `process_user_[id]` |
-| Task name | `send_to_john@acme.com` | `send_to_[email]` |
-| Queue name | `emails-jane@acme.com` | `emails-[email]` |
-| Task arguments | `{"user_id": 123, "token": "sk_..."}` | _never accessed_ |
+| Field | Local collection and logs | API representation |
+|-------|---------------------------|--------------------|
+| Queue name | Raw queue name | Emails and UUIDs replaced with placeholders |
+| Queue depth and oldest-task age | Numeric values | Numeric values |
+| Worker name | Raw Celery worker name | Hashed worker ID plus a short display name with the domain removed |
+| Active task ID | Present only for a detected stuck task | SHA-256-derived ID with a `t-` prefix |
+| Active task name | Raw name for a detected stuck task | Emails, UUIDs, and common numeric IDs replaced with placeholders |
+| Task arguments and results | Not extracted into Kanari metrics | Not serialized or transmitted |
 
-To inspect exactly what the agent collects in your environment:
+Important details:
 
-```bash
-kanari audit --json | python3 -m json.tool
-```
+- `audit` and `watch` process their results locally and do not contact the Kanari API.
+- `agent --local` writes collected records to stdout. Those records can contain raw queue names,
+  worker names, task names, and task IDs, so the logs should be treated as operational data.
+- API sanitization is pattern-based. Avoid putting sensitive data in task, queue, or worker names;
+  sanitization cannot recognize every possible identifier.
+- `kanari audit --json` is an aggregate audit summary, not a preview of the API payload.
 
----
+The payload construction is implemented in
+[`src/kanari_agent/api_client.py`](src/kanari_agent/api_client.py). See
+[Privacy and data](docs/reference/privacy.mdx) for the field-level reference.
 
-## CI/CD Integration
+## CI/CD
 
-```yaml
-# .github/workflows/health-check.yml
-- name: Celery health check
-  env:
-    REDIS_URL: ${{ secrets.REDIS_URL }}
-    CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
-  run: |
-    pip install kanari
-    kanari audit --json
-```
-
-Or in a shell script:
+`kanari audit` can be used as a CI check. Capture the exit code explicitly if the job needs to
+publish the JSON report before failing:
 
 ```bash
-#!/bin/bash
-kanari audit --json
-STATUS=$?
-if [ $STATUS -eq 2 ]; then
-  echo "CRITICAL: Celery issues detected"
-  # trigger PagerDuty, Slack, etc.
-  exit 1
-fi
+set +e
+kanari audit --json > kanari-audit.json
+status=$?
+set -e
+
+cat kanari-audit.json
+
+case "$status" in
+  0) exit 0 ;;
+  1) echo "Kanari reported warnings" >&2; exit 1 ;;
+  2) echo "Kanari reported a degraded or critical state" >&2; exit 2 ;;
+  *) echo "Kanari failed with exit code $status" >&2; exit "$status" ;;
+esac
 ```
 
----
+See the [CI/CD guide](docs/guides/cicd.mdx) for integration examples.
+
+## Alerting
+
+Local mode does not send notifications. Optional Slack and email notifications use API mode; see
+[alert configuration](docs/commands/alerts.mdx).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests welcome.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
 
----
-
 ## License
 
-Apache License 2.0 — See [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE).
